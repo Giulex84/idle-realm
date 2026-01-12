@@ -14,48 +14,42 @@
     body {
       margin: 0;
       font-family: system-ui, -apple-system;
-      background: #0b0e14;
-      color: #e6e6e6;
+      background: radial-gradient(circle at top, #0f172a, #020617);
+      color: #e5e7eb;
     }
 
     header {
-      padding: 16px;
-      background: #111827;
+      padding: 20px;
       border-bottom: 1px solid #1f2937;
     }
 
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: #9ca3af;
+    }
+
     main {
+      padding: 16px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 16px;
-      padding: 16px;
     }
 
     .panel {
-      background: #111827;
-      border-radius: 10px;
-      padding: 16px;
+      background: rgba(17, 24, 39, 0.85);
       border: 1px solid #1f2937;
+      border-radius: 14px;
+      padding: 16px;
     }
 
-    h1, h2, h3 {
+    h2 {
       margin-top: 0;
-    }
-
-    button {
-      background: #2563eb;
-      border: none;
-      color: white;
-      padding: 8px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      margin-top: 6px;
-      margin-right: 6px;
-    }
-
-    button:disabled {
-      background: #374151;
-      cursor: not-allowed;
+      font-size: 20px;
     }
 
     .stat {
@@ -67,15 +61,22 @@
     .good { color: #4ade80; }
     .bad { color: #f87171; }
 
-    .log {
-      font-size: 13px;
-      max-height: 200px;
-      overflow-y: auto;
-      background: #020617;
-      padding: 8px;
-      border-radius: 6px;
+    button {
+      background: #2563eb;
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 4px 4px 0 0;
     }
 
+    button:disabled {
+      background: #374151;
+      cursor: not-allowed;
+    }
+
+    /* ===== CITY GRID ===== */
     .city {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
@@ -84,14 +85,38 @@
     }
 
     .tile {
+      height: 56px;
+      border-radius: 10px;
       background: #020617;
       border: 1px solid #1f2937;
-      border-radius: 6px;
-      height: 48px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 22px;
+    }
+
+    .settlement { background: #1e293b; }
+    .workshop { background: #1f2937; }
+    .council { background: #312e81; }
+
+    /* ===== EVENTS ===== */
+    .event {
+      background: #020617;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .choices button {
+      background: #374151;
+      font-size: 13px;
+    }
+
+    .meta {
+      font-size: 14px;
+      color: #9ca3af;
     }
   </style>
 </head>
@@ -103,6 +128,7 @@
 </header>
 
 <main>
+  <!-- ===== REALM ===== -->
   <div class="panel">
     <h2>Realm</h2>
     <div class="stat"><span>Era</span><span id="era"></span></div>
@@ -111,24 +137,25 @@
     <div class="stat"><span>Stability</span><span id="stability"></span></div>
 
     <h3>Build</h3>
-    <button onclick="build('settlement')">Settlement</button>
-    <button onclick="build('workshop')">Workshop</button>
-    <button onclick="build('council')">Council</button>
+    <button onclick="build('settlement')">🏠 Settlement</button>
+    <button onclick="build('workshop')">⚒ Workshop</button>
+    <button onclick="build('council')">🏛 Council</button>
   </div>
 
+  <!-- ===== CITY ===== -->
   <div class="panel">
-    <h2>City View (prototype)</h2>
-    <p style="font-size:13px;color:#9ca3af">
-      This is the foundation for future visuals.
-    </p>
+    <h2>City</h2>
+    <p class="meta">Each tile represents a real structure in your realm.</p>
     <div class="city" id="city"></div>
   </div>
 
+  <!-- ===== EVENTS ===== -->
   <div class="panel">
     <h2>Events</h2>
-    <div class="log" id="eventLog"></div>
+    <div id="events"></div>
   </div>
 
+  <!-- ===== META ===== -->
   <div class="panel">
     <h2>Meta</h2>
     <div class="stat"><span>Play time</span><span id="playtime"></span></div>
@@ -139,7 +166,7 @@
 
 <script>
 /* ============================================================
-   CONFIG & STATE
+   STATE
 ============================================================ */
 const STORAGE_KEY = "idle_realm_save";
 
@@ -162,17 +189,18 @@ const DEFAULT_STATE = {
     workshop: 0,
     council: 0
   },
+  city: [],
+  events: [],
   stats: {
     playTime: 0,
     ticks: 0
-  },
-  events: []
+  }
 };
 
-const BUILD_COSTS = {
-  settlement: { production: 25, stability: 2 },
-  workshop: { production: 40, stability: 4 },
-  council: { production: 60, stability: 0 }
+const BUILD_COST = {
+  settlement: { production: 25, stability: 2, icon: "🏠" },
+  workshop: { production: 40, stability: 4, icon: "⚒" },
+  council: { production: 60, stability: 0, icon: "🏛" }
 };
 
 /* ============================================================
@@ -190,7 +218,7 @@ function saveState() {
 }
 
 /* ============================================================
-   GAME LOGIC
+   GAME LOOP
 ============================================================ */
 function applyTime() {
   const now = Date.now();
@@ -198,7 +226,6 @@ function applyTime() {
     Math.floor((now - state.meta.lastTick) / 1000),
     86400
   );
-
   if (elapsed <= 0) return;
 
   const prodRate =
@@ -221,8 +248,8 @@ function applyTime() {
     0, Math.min(100, state.resources.stability)
   );
 
-  if (Math.random() < elapsed * 0.0002) {
-    triggerEvent();
+  if (Math.random() < elapsed * 0.00015) {
+    createEvent();
   }
 
   state.meta.lastTick = now;
@@ -231,22 +258,48 @@ function applyTime() {
 }
 
 /* ============================================================
-   EVENTS
+   EVENTS WITH CHOICES
 ============================================================ */
-function triggerEvent() {
-  const e = state.resources.stability < 40
-    ? "Unrest spreads among the population."
-    : "A period of calm prosperity strengthens the realm.";
+function createEvent() {
+  const bad = state.resources.stability < 40;
 
-  state.events.unshift(e);
-  state.events = state.events.slice(0, 20);
+  const event = bad
+    ? {
+        text: "Unrest spreads among the population.",
+        choices: [
+          {
+            label: "Suppress dissent",
+            effect() { state.resources.stability += 5; }
+          },
+          {
+            label: "Ignore it",
+            effect() { state.resources.stability -= 5; }
+          }
+        ]
+      }
+    : {
+        text: "A calm period strengthens social cohesion.",
+        choices: [
+          {
+            label: "Encourage growth",
+            effect() { state.resources.population += 1; }
+          },
+          {
+            label: "Stockpile resources",
+            effect() { state.resources.production += 10; }
+          }
+        ]
+      };
+
+  state.events.unshift(event);
+  state.events = state.events.slice(0, 5);
 }
 
 /* ============================================================
    BUILDINGS
 ============================================================ */
 function build(type) {
-  const cost = BUILD_COSTS[type];
+  const cost = BUILD_COST[type];
   if (
     state.resources.production < cost.production ||
     state.resources.stability < cost.stability
@@ -255,7 +308,8 @@ function build(type) {
   state.resources.production -= cost.production;
   state.resources.stability -= cost.stability;
   state.buildings[type]++;
-  triggerEvent();
+  state.city.push(type);
+  createEvent();
 }
 
 /* ============================================================
@@ -274,23 +328,41 @@ function render() {
     Math.floor(state.stats.playTime / 60) + " min";
   document.getElementById("ticks").innerText = state.stats.ticks;
 
-  const log = document.getElementById("eventLog");
-  log.innerHTML = state.events.map(e => `• ${e}`).join("<br>");
-
   const city = document.getElementById("city");
   city.innerHTML = "";
-  Object.entries(state.buildings).forEach(([k, v]) => {
-    for (let i = 0; i < v; i++) {
-      const d = document.createElement("div");
-      d.className = "tile";
-      d.innerText = k;
-      city.appendChild(d);
-    }
+  state.city.forEach(type => {
+    const tile = document.createElement("div");
+    tile.className = "tile " + type;
+    tile.innerText = BUILD_COST[type].icon;
+    city.appendChild(tile);
+  });
+
+  const ev = document.getElementById("events");
+  ev.innerHTML = "";
+  state.events.forEach(e => {
+    const d = document.createElement("div");
+    d.className = "event";
+    d.innerHTML = `<p>${e.text}</p>`;
+    const c = document.createElement("div");
+    c.className = "choices";
+    e.choices.forEach(ch => {
+      const b = document.createElement("button");
+      b.innerText = ch.label;
+      b.onclick = () => {
+        ch.effect();
+        state.events = state.events.filter(x => x !== e);
+        saveState();
+        render();
+      };
+      c.appendChild(b);
+    });
+    d.appendChild(c);
+    ev.appendChild(d);
   });
 }
 
 /* ============================================================
-   LOOP
+   INIT
 ============================================================ */
 let state = loadState();
 
