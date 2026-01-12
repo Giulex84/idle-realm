@@ -4,57 +4,72 @@
   <meta charset="UTF-8" />
   <title>Pi SDK Baseline</title>
 
-  <!-- Pi SDK (OBBLIGATORIO) -->
+  <!-- Pi SDK -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 
-  <script>
-    let user = null;
-
-    // INIT SDK (OBBLIGATORIO)
-    document.addEventListener("DOMContentLoaded", () => {
-      if (!window.Pi) {
-        alert("Pi SDK not loaded. Use Pi Browser.");
-        return;
-      }
-
-      Pi.init({
-        version: "2.0",
-        sandbox: false
-      });
-    });
-
-    // LOGIN
-    function loginWithPi() {
-      Pi.authenticate(
-        ["username"],
-        function (auth) {
-          user = auth.user;
-          document.getElementById("status").innerText =
-            "Welcome: " + user.username;
-        },
-        function (error) {
-          console.error("Auth error:", error);
-          alert("Authentication failed");
-        }
-      );
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 30px;
     }
+    button {
+      padding: 10px 20px;
+      margin-right: 10px;
+      font-size: 16px;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
 
-    // PAYMENT
-    function payOnePi() {
-      if (!user) {
-        alert("Login first");
-        return;
+  <h1>Pi SDK Baseline</h1>
+
+  <button id="loginBtn">Login with Pi</button>
+  <button id="payBtn" disabled>Pay 1 Pi</button>
+
+  <div id="status"></div>
+
+  <script>
+    // 1️⃣ INIT SDK
+    Pi.init({ version: "2.0" });
+
+    let currentUser = null;
+
+    const status = document.getElementById("status");
+    const loginBtn = document.getElementById("loginBtn");
+    const payBtn = document.getElementById("payBtn");
+
+    // 2️⃣ LOGIN
+    loginBtn.onclick = async () => {
+      try {
+        const auth = await Pi.authenticate(
+          ["username"],
+          () => console.log("incomplete auth")
+        );
+
+        currentUser = auth.user.username;
+        status.innerText = "Logged in as: " + currentUser;
+        payBtn.disabled = false;
+      } catch (err) {
+        console.error(err);
+        status.innerText = "Login failed";
       }
+    };
 
+    // 3️⃣ PAYMENT
+    payBtn.onclick = () => {
       Pi.createPayment(
         {
           amount: 1,
           memo: "Test payment",
-          metadata: { app: "idle-realm" }
+          metadata: { purpose: "baseline-test" }
         },
         {
-          onReadyForServerApproval(paymentId) {
-            fetch("/api/pi", {
+          onReadyForServerApproval: async (paymentId) => {
+            await fetch("/api/pi", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -64,38 +79,31 @@
             });
           },
 
-          onReadyForServerCompletion(paymentId, txid) {
-            fetch("/api/pi", {
+          onReadyForServerCompletion: async (paymentId) => {
+            await fetch("/api/pi", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 action: "complete",
-                paymentId,
-                txid
+                paymentId
               })
             });
+
+            status.innerText = "Payment completed";
           },
 
-          onCancel(paymentId) {
-            console.log("Payment cancelled:", paymentId);
+          onCancel: () => {
+            status.innerText = "Payment cancelled";
           },
 
-          onError(error, payment) {
-            console.error("Payment error:", error, payment);
-            alert("Payment error");
+          onError: (err) => {
+            console.error(err);
+            status.innerText = "Payment error";
           }
         }
       );
-    }
+    };
   </script>
-</head>
 
-<body>
-  <h1>Pi SDK Baseline</h1>
-
-  <button onclick="loginWithPi()">Login with Pi</button>
-  <button onclick="payOnePi()">Pay 1 Pi</button>
-
-  <p id="status"></p>
 </body>
 </html>
