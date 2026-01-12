@@ -1,252 +1,318 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Idle Realm</title>
+<head>
+  <meta charset="UTF-8" />
+  <title>Idle Realm</title>
 
-    <!-- PI SDK (NON TOCCARE) -->
-    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-    <script>
-      Pi.init({ version: "2.0" });
-    </script>
+  <!-- ================= PI SDK (NON TOCCARE) ================= -->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+  <script>
+    Pi.init({ version: "2.0" });
+  </script>
 
-    <style>
-      body {
-        font-family: system-ui, -apple-system;
-        background: #0f1115;
-        color: #eaeaea;
-        padding: 24px;
-      }
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system;
+      background: #0b0e14;
+      color: #e6e6e6;
+    }
 
-      h1 {
-        margin-bottom: 4px;
-      }
+    header {
+      padding: 16px;
+      background: #111827;
+      border-bottom: 1px solid #1f2937;
+    }
 
-      button {
-        padding: 8px 12px;
-        border-radius: 6px;
-        border: none;
-        background: #3a6df0;
-        color: white;
-        cursor: pointer;
-        margin-right: 6px;
-        margin-top: 6px;
-      }
+    main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px;
+    }
 
-      button:disabled {
-        background: #444;
-        cursor: not-allowed;
-      }
+    .panel {
+      background: #111827;
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid #1f2937;
+    }
 
-      .panel {
-        background: #1a1d24;
-        padding: 16px;
-        border-radius: 8px;
-        margin-top: 16px;
-      }
+    h1, h2, h3 {
+      margin-top: 0;
+    }
 
-      pre {
-        white-space: pre-wrap;
-        font-size: 14px;
-        line-height: 1.4;
-      }
-    </style>
-  </head>
+    button {
+      background: #2563eb;
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 6px;
+      margin-right: 6px;
+    }
 
-  <body>
-    <h1>Idle Realm</h1>
-    <p>Local-first idle strategy world</p>
+    button:disabled {
+      background: #374151;
+      cursor: not-allowed;
+    }
 
-    <div class="panel">
-      <pre id="output">loading...</pre>
-    </div>
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
 
-    <div class="panel">
-      <h3>Build</h3>
-      <button onclick="build('settlement')">Settlement</button>
-      <button onclick="build('workshop')">Workshop</button>
-      <button onclick="build('council')">Council</button>
-    </div>
+    .good { color: #4ade80; }
+    .bad { color: #f87171; }
 
-    <div class="panel">
-      <button onclick="resetGame()">Reset World</button>
-    </div>
+    .log {
+      font-size: 13px;
+      max-height: 200px;
+      overflow-y: auto;
+      background: #020617;
+      padding: 8px;
+      border-radius: 6px;
+    }
 
-    <script>
-      /*************************************************
-       * CONFIG
-       *************************************************/
-      const STORAGE_KEY = "idle_realm_save";
+    .city {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-top: 12px;
+    }
 
-      const DEFAULT_STATE = {
-        meta: {
-          version: 1,
-          createdAt: Date.now(),
-          lastTick: Date.now()
-        },
+    .tile {
+      background: #020617;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+  </style>
+</head>
 
-        realm: {
-          name: "Idle Realm",
-          era: "foundations"
-        },
+<body>
+<header>
+  <h1>Idle Realm</h1>
+  <p>A living world that grows with time</p>
+</header>
 
-        resources: {
-          population: 10,
-          production: 20,
-          stability: 70
-        },
+<main>
+  <div class="panel">
+    <h2>Realm</h2>
+    <div class="stat"><span>Era</span><span id="era"></span></div>
+    <div class="stat"><span>Population</span><span id="population"></span></div>
+    <div class="stat"><span>Production</span><span id="production"></span></div>
+    <div class="stat"><span>Stability</span><span id="stability"></span></div>
 
-        buildings: {
-          settlement: 1,
-          workshop: 0,
-          council: 0
-        },
+    <h3>Build</h3>
+    <button onclick="build('settlement')">Settlement</button>
+    <button onclick="build('workshop')">Workshop</button>
+    <button onclick="build('council')">Council</button>
+  </div>
 
-        stats: {
-          totalPlayTime: 0,
-          ticks: 0
-        }
-      };
+  <div class="panel">
+    <h2>City View (prototype)</h2>
+    <p style="font-size:13px;color:#9ca3af">
+      This is the foundation for future visuals.
+    </p>
+    <div class="city" id="city"></div>
+  </div>
 
-      const BUILDING_COSTS = {
-        settlement: { production: 20, stability: 2 },
-        workshop: { production: 30, stability: 5 },
-        council: { production: 50, stability: 0 }
-      };
+  <div class="panel">
+    <h2>Events</h2>
+    <div class="log" id="eventLog"></div>
+  </div>
 
-      /*************************************************
-       * LOAD / SAVE
-       *************************************************/
-      function loadState() {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return structuredClone(DEFAULT_STATE);
-        try {
-          return migrateState(JSON.parse(raw));
-        } catch {
-          return structuredClone(DEFAULT_STATE);
-        }
-      }
+  <div class="panel">
+    <h2>Meta</h2>
+    <div class="stat"><span>Play time</span><span id="playtime"></span></div>
+    <div class="stat"><span>Ticks</span><span id="ticks"></span></div>
+    <button onclick="resetGame()">Reset World</button>
+  </div>
+</main>
 
-      function saveState(state) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      }
+<script>
+/* ============================================================
+   CONFIG & STATE
+============================================================ */
+const STORAGE_KEY = "idle_realm_save";
 
-      function migrateState(state) {
-        if (!state.meta || state.meta.version !== 1) {
-          return structuredClone(DEFAULT_STATE);
-        }
-        return state;
-      }
+const DEFAULT_STATE = {
+  meta: {
+    version: 1,
+    createdAt: Date.now(),
+    lastTick: Date.now()
+  },
+  realm: {
+    era: "Foundations"
+  },
+  resources: {
+    population: 10,
+    production: 20,
+    stability: 70
+  },
+  buildings: {
+    settlement: 1,
+    workshop: 0,
+    council: 0
+  },
+  stats: {
+    playTime: 0,
+    ticks: 0
+  },
+  events: []
+};
 
-      /*************************************************
-       * IDLE TIME SIMULATION
-       *************************************************/
-      function applyTime(state) {
-        const now = Date.now();
-        const elapsedMs = now - state.meta.lastTick;
-        const elapsedSeconds = Math.floor(elapsedMs / 1000);
-        if (elapsedSeconds <= 0) return state;
+const BUILD_COSTS = {
+  settlement: { production: 25, stability: 2 },
+  workshop: { production: 40, stability: 4 },
+  council: { production: 60, stability: 0 }
+};
 
-        // Production rate
-        const productionRate =
-          state.resources.population * 0.1 +
-          state.buildings.workshop * 0.5;
+/* ============================================================
+   LOAD / SAVE
+============================================================ */
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return structuredClone(DEFAULT_STATE);
+  try { return JSON.parse(raw); }
+  catch { return structuredClone(DEFAULT_STATE); }
+}
 
-        state.resources.production += productionRate * elapsedSeconds;
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
 
-        // Population growth
-        if (state.resources.stability > 50) {
-          state.resources.population +=
-            elapsedSeconds * (0.01 + state.buildings.settlement * 0.002);
-        }
+/* ============================================================
+   GAME LOGIC
+============================================================ */
+function applyTime() {
+  const now = Date.now();
+  const elapsed = Math.min(
+    Math.floor((now - state.meta.lastTick) / 1000),
+    86400
+  );
 
-        // Stability effects
-        state.resources.stability -=
-          elapsedSeconds * (0.003 + state.buildings.workshop * 0.001);
+  if (elapsed <= 0) return;
 
-        state.resources.stability +=
-          state.buildings.council * 0.002 * elapsedSeconds;
+  const prodRate =
+    state.resources.population * 0.1 +
+    state.buildings.workshop * 0.6;
 
-        state.resources.stability = Math.max(
-          0,
-          Math.min(100, state.resources.stability)
-        );
+  state.resources.production += prodRate * elapsed;
 
-        state.meta.lastTick = now;
-        state.stats.ticks += elapsedSeconds;
-        state.stats.totalPlayTime += elapsedSeconds;
+  if (state.resources.stability > 50) {
+    state.resources.population += elapsed * 0.01;
+  }
 
-        return state;
-      }
+  state.resources.stability +=
+    state.buildings.council * 0.002 * elapsed;
 
-      /*************************************************
-       * BUILDINGS
-       *************************************************/
-      function canAfford(cost, state) {
-        return (
-          state.resources.production >= cost.production &&
-          state.resources.stability >= cost.stability
-        );
-      }
+  state.resources.stability -=
+    elapsed * (0.004 + state.buildings.workshop * 0.001);
 
-      function build(type) {
-        const cost = BUILDING_COSTS[type];
-        if (!canAfford(cost, state)) return;
+  state.resources.stability = Math.max(
+    0, Math.min(100, state.resources.stability)
+  );
 
-        state.resources.production -= cost.production;
-        state.resources.stability -= cost.stability;
-        state.buildings[type]++;
-        saveState(state);
-        render(state);
-      }
+  if (Math.random() < elapsed * 0.0002) {
+    triggerEvent();
+  }
 
-      /*************************************************
-       * RENDER
-       *************************************************/
-      function render(state) {
-        document.getElementById("output").innerText = `
-ERA: ${state.realm.era}
+  state.meta.lastTick = now;
+  state.stats.playTime += elapsed;
+  state.stats.ticks += elapsed;
+}
 
-RESOURCES
-- Population : ${state.resources.population.toFixed(1)}
-- Production : ${state.resources.production.toFixed(1)}
-- Stability  : ${state.resources.stability.toFixed(1)}
+/* ============================================================
+   EVENTS
+============================================================ */
+function triggerEvent() {
+  const e = state.resources.stability < 40
+    ? "Unrest spreads among the population."
+    : "A period of calm prosperity strengthens the realm.";
 
-BUILDINGS
-- Settlement : ${state.buildings.settlement}
-- Workshop   : ${state.buildings.workshop}
-- Council    : ${state.buildings.council}
+  state.events.unshift(e);
+  state.events = state.events.slice(0, 20);
+}
 
-STATS
-- Play time  : ${Math.floor(state.stats.totalPlayTime / 60)} min
-- Ticks      : ${state.stats.ticks}
-`;
-      }
+/* ============================================================
+   BUILDINGS
+============================================================ */
+function build(type) {
+  const cost = BUILD_COSTS[type];
+  if (
+    state.resources.production < cost.production ||
+    state.resources.stability < cost.stability
+  ) return;
 
-      /*************************************************
-       * GAME LOOP
-       *************************************************/
-      let state = loadState();
+  state.resources.production -= cost.production;
+  state.resources.stability -= cost.stability;
+  state.buildings[type]++;
+  triggerEvent();
+}
 
-      function gameLoop() {
-        state = applyTime(state);
-        saveState(state);
-        render(state);
-      }
+/* ============================================================
+   RENDER
+============================================================ */
+function render() {
+  document.getElementById("era").innerText = state.realm.era;
+  document.getElementById("population").innerText =
+    state.resources.population.toFixed(1);
+  document.getElementById("production").innerText =
+    state.resources.production.toFixed(1);
+  document.getElementById("stability").innerText =
+    state.resources.stability.toFixed(1);
 
-      setInterval(gameLoop, 1000);
-      render(state);
+  document.getElementById("playtime").innerText =
+    Math.floor(state.stats.playTime / 60) + " min";
+  document.getElementById("ticks").innerText = state.stats.ticks;
 
-      /*************************************************
-       * RESET
-       *************************************************/
-      function resetGame() {
-        if (!confirm("Reset the world?")) return;
-        localStorage.removeItem(STORAGE_KEY);
-        state = structuredClone(DEFAULT_STATE);
-        saveState(state);
-        render(state);
-      }
-    </script>
-  </body>
+  const log = document.getElementById("eventLog");
+  log.innerHTML = state.events.map(e => `• ${e}`).join("<br>");
+
+  const city = document.getElementById("city");
+  city.innerHTML = "";
+  Object.entries(state.buildings).forEach(([k, v]) => {
+    for (let i = 0; i < v; i++) {
+      const d = document.createElement("div");
+      d.className = "tile";
+      d.innerText = k;
+      city.appendChild(d);
+    }
+  });
+}
+
+/* ============================================================
+   LOOP
+============================================================ */
+let state = loadState();
+
+function loop() {
+  applyTime();
+  saveState();
+  render();
+}
+
+setInterval(loop, 1000);
+render();
+
+/* ============================================================
+   RESET
+============================================================ */
+function resetGame() {
+  if (!confirm("Reset the realm?")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = structuredClone(DEFAULT_STATE);
+  saveState();
+  render();
+}
+</script>
+</body>
 </html>
