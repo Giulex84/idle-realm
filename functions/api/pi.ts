@@ -1,22 +1,34 @@
-export async function onRequestPost({ request, env }) {
-  const body = await request.json();
-  const { action, paymentId } = body;
+export async function onRequest(context: any) {
+  const { request, env } = context;
 
-  if (action !== "approve") {
-    return new Response("Invalid action", { status: 400 });
+  const body = await request.json();
+  const { action, paymentId, txid } = body;
+
+  console.log("PI EVENT:", action, paymentId, txid);
+
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Key ${env.PI_API_KEY}`
+  };
+
+  if (action === "approve") {
+    await fetch(`https://api.minepi.com/v2/payments/${paymentId}/approve`, {
+      method: "POST",
+      headers
+    });
+
+    console.log("APPROVED:", paymentId);
   }
 
-  const res = await fetch(
-    `https://api.minepi.com/v2/payments/${paymentId}/approve`,
-    {
+  if (action === "complete") {
+    await fetch(`https://api.minepi.com/v2/payments/${paymentId}/complete`, {
       method: "POST",
-      headers: {
-        Authorization: `Key ${env.PI_API_KEY}`,
-        "Content-Type": "application/json"
-      }
-    }
-  );
+      headers,
+      body: JSON.stringify({ txid })
+    });
 
-  const text = await res.text();
-  return new Response(text);
+    console.log("COMPLETED:", paymentId);
+  }
+
+  return new Response("ok");
 }
