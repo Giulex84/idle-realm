@@ -1,109 +1,60 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
   <meta charset="UTF-8" />
   <title>Pi SDK Baseline</title>
-
-  <!-- Pi SDK -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 30px;
-    }
-    button {
-      padding: 10px 20px;
-      margin-right: 10px;
-      font-size: 16px;
-    }
-    #status {
-      margin-top: 20px;
-      font-weight: bold;
-    }
-  </style>
 </head>
 <body>
-
   <h1>Pi SDK Baseline</h1>
 
   <button id="loginBtn">Login with Pi</button>
   <button id="payBtn" disabled>Pay 1 Pi</button>
 
-  <div id="status"></div>
+  <p id="status"></p>
 
-  <script>
-    // 1️⃣ INIT SDK
-    Pi.init({ version: "2.0" });
+<script>
+  Pi.init({ version: "2.0" });
 
-    let currentUser = null;
+  let user = null;
 
-    const status = document.getElementById("status");
-    const loginBtn = document.getElementById("loginBtn");
-    const payBtn = document.getElementById("payBtn");
+  document.getElementById("loginBtn").onclick = async () => {
+    try {
+      const auth = await Pi.authenticate(["username"], () => {});
+      user = auth.user;
+      document.getElementById("status").innerText =
+        "Welcome: " + user.username;
+      document.getElementById("payBtn").disabled = false;
+    } catch (e) {
+      document.getElementById("status").innerText = "Login failed";
+    }
+  };
 
-    // 2️⃣ LOGIN
-    loginBtn.onclick = async () => {
-      try {
-        const auth = await Pi.authenticate(
-          ["username"],
-          () => console.log("incomplete auth")
-        );
+  document.getElementById("payBtn").onclick = async () => {
+    try {
+      const payment = await Pi.createPayment({
+        amount: 1,
+        memo: "Idle Realm Test Payment",
+        metadata: { reason: "test" }
+      });
 
-        currentUser = auth.user.username;
-        status.innerText = "Logged in as: " + currentUser;
-        payBtn.disabled = false;
-      } catch (err) {
-        console.error(err);
-        status.innerText = "Login failed";
-      }
-    };
+      // 🔴 QUESTO È IL PUNTO CRITICO
+      await fetch("/api/pi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve",
+          paymentId: payment.identifier
+        })
+      });
 
-    // 3️⃣ PAYMENT
-    payBtn.onclick = () => {
-      Pi.createPayment(
-        {
-          amount: 1,
-          memo: "Test payment",
-          metadata: { purpose: "baseline-test" }
-        },
-        {
-          onReadyForServerApproval: async (paymentId) => {
-            await fetch("/api/pi", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "approve",
-                paymentId
-              })
-            });
-          },
-
-          onReadyForServerCompletion: async (paymentId) => {
-            await fetch("/api/pi", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "complete",
-                paymentId
-              })
-            });
-
-            status.innerText = "Payment completed";
-          },
-
-          onCancel: () => {
-            status.innerText = "Payment cancelled";
-          },
-
-          onError: (err) => {
-            console.error(err);
-            status.innerText = "Payment error";
-          }
-        }
-      );
-    };
-  </script>
-
+      document.getElementById("status").innerText =
+        "Payment approved";
+    } catch (e) {
+      document.getElementById("status").innerText =
+        "Payment failed";
+    }
+  };
+</script>
 </body>
 </html>
