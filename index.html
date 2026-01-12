@@ -1,321 +1,266 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Idle Realm</title>
+  <meta charset="UTF-8" />
+  <title>Idle Realm</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<!-- PI SDK – NON TOCCARE -->
-<script src="https://sdk.minepi.com/pi-sdk.js"></script>
-<script>
-  Pi.init({ version: "2.0" });
-</script>
+  <!-- Pi SDK (NON TOCCARE) -->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+  <script>
+    Pi.init({ version: "2.0" });
+  </script>
 
-<style>
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system;
-  background: radial-gradient(circle at top, #0f172a, #020617);
-  color: #e5e7eb;
-}
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at top, #0b132b, #020617);
+      color: #e5e7eb;
+    }
 
-header {
-  padding: 20px;
-  border-bottom: 1px solid #1f2937;
-}
+    /* HUD */
+    #hud {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(2, 6, 23, 0.95);
+      display: flex;
+      justify-content: space-around;
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 14px;
+    }
 
-header h1 {
-  margin: 0;
-  font-size: 28px;
-}
+    #hud span {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
 
-header p {
-  margin: 4px 0 0;
-  color: #9ca3af;
-}
+    main {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      max-width: 900px;
+      margin: auto;
+    }
 
-main {
-  padding: 16px;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
+    h1 {
+      font-size: 32px;
+      margin-bottom: 0;
+    }
 
-@media (min-width: 900px) {
-  main { grid-template-columns: 1fr 1fr; }
-}
+    .subtitle {
+      color: #9ca3af;
+      margin-top: 4px;
+    }
 
-.panel {
-  background: rgba(17,24,39,0.95);
-  border: 1px solid #1f2937;
-  border-radius: 14px;
-  padding: 16px;
-}
+    .card {
+      background: linear-gradient(180deg, #020617, #020617cc);
+      border-radius: 16px;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
 
-h2 {
-  margin-top: 0;
-}
+    .card h2 {
+      margin-top: 0;
+    }
 
-.stat {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
+    .build-buttons button {
+      margin: 6px 6px 0 0;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
 
-button {
-  background: #2563eb;
-  border: none;
-  color: white;
-  padding: 8px 12px;
-  border-radius: 8px;
-  margin: 4px 4px 0 0;
-}
+    .build-buttons button:hover {
+      background: #1d4ed8;
+    }
 
-button:disabled {
-  background: #374151;
-}
+    .district {
+      margin-top: 10px;
+      font-size: 18px;
+    }
 
-.badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 13px;
-  margin-bottom: 6px;
-}
+    .event-log {
+      font-size: 14px;
+      color: #d1d5db;
+    }
 
-.badge.good { background: #064e3b; }
-.badge.warn { background: #78350f; }
-.badge.bad  { background: #7f1d1d; }
+    .event-log div {
+      margin-bottom: 6px;
+    }
 
-/* ===== CITY VISUAL ===== */
-.district {
-  margin-bottom: 10px;
-}
+    .reset {
+      background: #dc2626;
+      border: none;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
 
-.icons {
-  font-size: 22px;
-  word-break: break-all;
-}
-
-/* ===== EVENTS ===== */
-.event {
-  background: #020617;
-  border: 1px solid #1f2937;
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 10px;
-}
-
-.event h4 {
-  margin: 0 0 6px 0;
-}
-
-.event button {
-  background: #374151;
-  font-size: 13px;
-}
-</style>
+    .reset:hover {
+      background: #b91c1c;
+    }
+  </style>
 </head>
-
 <body>
-<header>
-  <h1>Idle Realm</h1>
-  <p>A living world shaped by time and eras</p>
-</header>
 
-<main>
-  <!-- REALM -->
-  <div class="panel">
-    <h2>Realm</h2>
-    <div class="stat"><span>Era</span><span id="era"></span></div>
-    <div class="stat"><span>Population</span><span id="pop"></span></div>
-    <div class="stat"><span>Production</span><span id="prod"></span></div>
-    <div class="stat"><span>Stability</span><span id="stab"></span></div>
-    <div id="realmState"></div>
-
-    <h3>Build</h3>
-    <button onclick="build('settlement')">🏠 Settlement</button>
-    <button onclick="build('workshop')">⚒ Workshop</button>
-    <button onclick="build('council')">🏛 Council</button>
+  <!-- HUD -->
+  <div id="hud">
+    <span>👥 <strong id="hud-pop">0</strong></span>
+    <span>⚒ <strong id="hud-prod">0</strong></span>
+    <span>🛡 <strong id="hud-stab">0</strong>%</span>
+    <span>🕰 <strong id="hud-era">Foundations</strong></span>
   </div>
 
-  <!-- CITY -->
-  <div class="panel">
-    <h2>City</h2>
+  <main>
+    <header>
+      <h1>Idle Realm</h1>
+      <div class="subtitle">A living world shaped by time and eras</div>
+    </header>
 
-    <div class="district">
-      <strong>Residential District</strong>
-      <div class="icons" id="settlements"></div>
+    <div class="card">
+      <h2>Realm</h2>
+      <div>Era: <strong id="era-text"></strong></div>
+      <div>Population: <strong id="pop-text"></strong></div>
+      <div>Production: <strong id="prod-text"></strong></div>
+      <div>Stability: <strong id="stab-text"></strong>%</div>
+
+      <h3>Build</h3>
+      <div class="build-buttons">
+        <button onclick="build('settlement')">🏠 Settlement</button>
+        <button onclick="build('workshop')">⚒ Workshop</button>
+        <button onclick="build('council')">🏛 Council</button>
+      </div>
     </div>
 
-    <div class="district">
-      <strong>Industrial District</strong>
-      <div class="icons" id="workshops"></div>
+    <div class="card">
+      <h2>City</h2>
+      <div class="district">🏘 Residential: <span id="res-vis"></span></div>
+      <div class="district">⚒ Industrial: <span id="ind-vis"></span></div>
+      <div class="district">🏛 Government: <span id="gov-vis"></span></div>
     </div>
 
-    <div class="district">
-      <strong>Government District</strong>
-      <div class="icons" id="councils"></div>
+    <div class="card">
+      <h2>Events</h2>
+      <div class="event-log" id="events"></div>
     </div>
-  </div>
 
-  <!-- EVENTS -->
-  <div class="panel">
-    <h2>Events</h2>
-    <div id="events"></div>
-  </div>
+    <div class="card">
+      <h2>Meta</h2>
+      <div>Ticks: <strong id="ticks-text"></strong></div>
+      <button class="reset" onclick="resetWorld()">Reset World</button>
+    </div>
+  </main>
 
-  <!-- META -->
-  <div class="panel">
-    <h2>Meta</h2>
-    <div class="stat"><span>Play time</span><span id="play"></span></div>
-    <div class="stat"><span>Ticks</span><span id="ticks"></span></div>
-    <button onclick="resetGame()">Reset World</button>
-  </div>
-</main>
+  <script>
+    const SAVE_KEY = "idle_realm_save_v1";
 
-<script>
-/* ================= STATE ================= */
-var KEY = "idle_realm_save";
+    let state = {
+      era: "Foundations",
+      population: 10,
+      production: 5,
+      stability: 70,
+      buildings: {
+        settlement: 1,
+        workshop: 0,
+        council: 0
+      },
+      events: [],
+      ticks: 0
+    };
 
-var ERAS = [
-  { name: "Foundations", pop: 0.01, prod: 1.0, decay: 0.003, desc: "A fragile but hopeful beginning." },
-  { name: "Expansion", pop: 0.015, prod: 1.2, decay: 0.005, desc: "Rapid growth fuels ambition and unrest." },
-  { name: "Crisis", pop: 0.005, prod: 0.9, decay: 0.01, desc: "Stability is threatened across the realm." }
-];
+    function load() {
+      const saved = localStorage.getItem(SAVE_KEY);
+      if (saved) state = JSON.parse(saved);
+    }
 
-function defaultState() {
-  return {
-    era: 0,
-    pop: 10,
-    prod: 20,
-    stab: 70,
-    buildings: { settlement: 1, workshop: 0, council: 0 },
-    events: [],
-    last: Date.now(),
-    ticks: 0,
-    play: 0
-  };
-}
+    function save() {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    }
 
-var saved = localStorage.getItem(KEY);
-var state = saved ? JSON.parse(saved) : defaultState();
+    function logEvent(text) {
+      state.events.unshift(text);
+      if (state.events.length > 6) state.events.pop();
+    }
 
-/* ================= CORE LOOP ================= */
-function loop() {
-  var now = Date.now();
-  var sec = Math.min((now - state.last) / 1000, 86400);
-  if (sec <= 0) return;
+    function build(type) {
+      if (type === "settlement") {
+        state.population += 2;
+        state.buildings.settlement++;
+        logEvent("🏠 Settlement founded (+2 population)");
+      }
+      if (type === "workshop") {
+        state.production += 3;
+        state.buildings.workshop++;
+        logEvent("⚒ Workshop built (+3 production)");
+      }
+      if (type === "council") {
+        state.stability += 5;
+        state.buildings.council++;
+        logEvent("🏛 Council established (+5 stability)");
+      }
+      render();
+      save();
+    }
 
-  var era = ERAS[state.era];
+    function resetWorld() {
+      localStorage.removeItem(SAVE_KEY);
+      location.reload();
+    }
 
-  state.prod += state.pop * 0.1 * era.prod * sec;
-  if (state.stab > 40) state.pop += era.pop * sec;
-  state.stab -= era.decay * sec;
+    function renderDistrict(count) {
+      return "■".repeat(count);
+    }
 
-  state.stab = Math.max(0, Math.min(100, state.stab));
+    function render() {
+      document.getElementById("hud-pop").textContent = state.population.toFixed(1);
+      document.getElementById("hud-prod").textContent = state.production.toFixed(1);
+      document.getElementById("hud-stab").textContent = Math.max(0, Math.min(100, state.stability));
+      document.getElementById("hud-era").textContent = state.era;
 
-  if (state.pop > 80) state.era = 2;
-  else if (state.pop > 30) state.era = 1;
+      document.getElementById("era-text").textContent = state.era;
+      document.getElementById("pop-text").textContent = state.population.toFixed(1);
+      document.getElementById("prod-text").textContent = state.production.toFixed(1);
+      document.getElementById("stab-text").textContent = Math.max(0, Math.min(100, state.stability));
 
-  if (Math.random() < sec * 0.00015) createEvent();
+      document.getElementById("res-vis").textContent = renderDistrict(state.buildings.settlement);
+      document.getElementById("ind-vis").textContent = renderDistrict(state.buildings.workshop);
+      document.getElementById("gov-vis").textContent = renderDistrict(state.buildings.council);
 
-  state.last = now;
-  state.ticks += sec;
-  state.play += sec;
+      const ev = document.getElementById("events");
+      ev.innerHTML = "";
+      state.events.forEach(e => {
+        const d = document.createElement("div");
+        d.textContent = "• " + e;
+        ev.appendChild(d);
+      });
 
-  save();
-  render();
-}
+      document.getElementById("ticks-text").textContent = state.ticks;
+    }
 
-function save() {
-  localStorage.setItem(KEY, JSON.stringify(state));
-}
+    function tick() {
+      state.population += state.buildings.settlement * 0.02;
+      state.production += state.buildings.workshop * 0.05;
+      state.stability -= state.buildings.settlement * 0.01;
+      state.ticks++;
+      render();
+      save();
+    }
 
-/* ================= BUILD ================= */
-function build(type) {
-  var cost = { settlement: 25, workshop: 40, council: 60 }[type];
-  if (state.prod < cost) return;
+    load();
+    render();
+    setInterval(tick, 1000);
+  </script>
 
-  state.prod -= cost;
-  state.buildings[type]++;
-  render();
-  save();
-}
-
-/* ================= EVENTS ================= */
-function createEvent() {
-  var bad = state.stab < 40;
-  var e = bad ? {
-    title: "Civil Unrest",
-    text: "Tensions rise among the population.",
-    choices: [
-      { label: "Repress", effect: function(){ state.stab += 5; } },
-      { label: "Reform", effect: function(){ state.pop -= 1; } }
-    ]
-  } : {
-    title: "Trade Opportunity",
-    text: "Merchants bring new wealth.",
-    choices: [
-      { label: "Tax Trade", effect: function(){ state.prod += 20; } },
-      { label: "Welcome Migrants", effect: function(){ state.pop += 2; } }
-    ]
-  };
-
-  state.events.unshift(e);
-  state.events = state.events.slice(0, 3);
-}
-
-/* ================= RENDER ================= */
-function render() {
-  document.getElementById("era").innerText = ERAS[state.era].name;
-  document.getElementById("pop").innerText = state.pop.toFixed(1);
-  document.getElementById("prod").innerText = state.prod.toFixed(1);
-  document.getElementById("stab").innerText = state.stab.toFixed(1);
-  document.getElementById("play").innerText = Math.floor(state.play/60) + " min";
-  document.getElementById("ticks").innerText = Math.floor(state.ticks);
-
-  var badge = "";
-  if (state.stab > 70) badge = '<span class="badge good">Prosperous Realm</span>';
-  else if (state.stab > 40) badge = '<span class="badge warn">Strained Society</span>';
-  else badge = '<span class="badge bad">Unstable Realm</span>';
-  document.getElementById("realmState").innerHTML = badge + "<p>" + ERAS[state.era].desc + "</p>";
-
-  document.getElementById("settlements").innerText = "🏠".repeat(state.buildings.settlement);
-  document.getElementById("workshops").innerText = "⚒".repeat(state.buildings.workshop);
-  document.getElementById("councils").innerText = "🏛".repeat(state.buildings.council);
-
-  var ev = document.getElementById("events");
-  ev.innerHTML = "";
-  state.events.forEach(function(e, idx){
-    var d = document.createElement("div");
-    d.className = "event";
-    d.innerHTML = "<h4>"+e.title+"</h4><p>"+e.text+"</p>";
-    e.choices.forEach(function(c){
-      var b = document.createElement("button");
-      b.innerText = c.label;
-      b.onclick = function(){
-        c.effect();
-        state.events.splice(idx,1);
-        save();
-        render();
-      };
-      d.appendChild(b);
-    });
-    ev.appendChild(d);
-  });
-}
-
-/* ================= RESET ================= */
-function resetGame() {
-  if (!confirm("Reset the realm?")) return;
-  localStorage.removeItem(KEY);
-  state = defaultState();
-  save();
-  render();
-}
-
-setInterval(loop, 1000);
-render();
-</script>
 </body>
 </html>
