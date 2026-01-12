@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Idle Realm</title>
 
-    <!-- Pi SDK (auth resta, ma qui non lo usiamo ancora) -->
+    <!-- PI SDK (NON TOCCARE) -->
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     <script>
       Pi.init({ version: "2.0" });
@@ -12,48 +12,65 @@
 
     <style>
       body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont;
-        background: #111;
-        color: #eee;
+        font-family: system-ui, -apple-system;
+        background: #0f1115;
+        color: #eaeaea;
         padding: 24px;
       }
 
       h1 {
-        margin-bottom: 10px;
-      }
-
-      pre {
-        background: #1e1e1e;
-        padding: 16px;
-        border-radius: 8px;
-        font-size: 14px;
-        line-height: 1.4;
+        margin-bottom: 4px;
       }
 
       button {
-        margin-top: 16px;
-        padding: 10px 14px;
+        padding: 8px 12px;
         border-radius: 6px;
         border: none;
-        cursor: pointer;
         background: #3a6df0;
         color: white;
-        font-size: 14px;
+        cursor: pointer;
+        margin-right: 6px;
+        margin-top: 6px;
       }
 
-      button:hover {
-        background: #2f5bd3;
+      button:disabled {
+        background: #444;
+        cursor: not-allowed;
+      }
+
+      .panel {
+        background: #1a1d24;
+        padding: 16px;
+        border-radius: 8px;
+        margin-top: 16px;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        font-size: 14px;
+        line-height: 1.4;
       }
     </style>
   </head>
 
   <body>
     <h1>Idle Realm</h1>
-    <p>Local-first idle world simulation</p>
+    <p>Local-first idle strategy world</p>
 
-    <pre id="output">loading...</pre>
+    <div class="panel">
+      <pre id="output">loading...</pre>
+    </div>
 
-    <button onclick="resetGame()">Reset World</button>
+    <div class="panel">
+      <h3>Build</h3>
+      <button onclick="build('settlement')">Settlement</button>
+      <button onclick="build('workshop')">Workshop</button>
+      <button onclick="build('council')">Council</button>
+    </div>
+
+    <div class="panel">
+      <button onclick="resetGame()">Reset World</button>
+    </div>
 
     <script>
       /*************************************************
@@ -75,7 +92,7 @@
 
         resources: {
           population: 10,
-          production: 5,
+          production: 20,
           stability: 70
         },
 
@@ -85,15 +102,16 @@
           council: 0
         },
 
-        modifiers: {
-          productionBonus: 1.0,
-          stabilityBonus: 1.0
-        },
-
         stats: {
           totalPlayTime: 0,
           ticks: 0
         }
+      };
+
+      const BUILDING_COSTS = {
+        settlement: { production: 20, stability: 2 },
+        workshop: { production: 30, stability: 5 },
+        council: { production: 50, stability: 0 }
       };
 
       /*************************************************
@@ -102,10 +120,8 @@
       function loadState() {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return structuredClone(DEFAULT_STATE);
-
         try {
-          const parsed = JSON.parse(raw);
-          return migrateState(parsed);
+          return migrateState(JSON.parse(raw));
         } catch {
           return structuredClone(DEFAULT_STATE);
         }
@@ -123,32 +139,34 @@
       }
 
       /*************************************************
-       * TIME SIMULATION (IDLE CORE)
+       * IDLE TIME SIMULATION
        *************************************************/
       function applyTime(state) {
         const now = Date.now();
         const elapsedMs = now - state.meta.lastTick;
         const elapsedSeconds = Math.floor(elapsedMs / 1000);
-
         if (elapsedSeconds <= 0) return state;
 
-        // Production grows with population
+        // Production rate
         const productionRate =
-          state.resources.population *
-          0.1 *
-          state.modifiers.productionBonus;
+          state.resources.population * 0.1 +
+          state.buildings.workshop * 0.5;
 
         state.resources.production += productionRate * elapsedSeconds;
 
-        // Population grows slowly if stable
+        // Population growth
         if (state.resources.stability > 50) {
-          state.resources.population += elapsedSeconds * 0.01;
+          state.resources.population +=
+            elapsedSeconds * (0.01 + state.buildings.settlement * 0.002);
         }
 
-        // Stability slowly decays
-        state.resources.stability -= elapsedSeconds * 0.005;
+        // Stability effects
+        state.resources.stability -=
+          elapsedSeconds * (0.003 + state.buildings.workshop * 0.001);
 
-        // Clamp stability
+        state.resources.stability +=
+          state.buildings.council * 0.002 * elapsedSeconds;
+
         state.resources.stability = Math.max(
           0,
           Math.min(100, state.resources.stability)
@@ -159,6 +177,27 @@
         state.stats.totalPlayTime += elapsedSeconds;
 
         return state;
+      }
+
+      /*************************************************
+       * BUILDINGS
+       *************************************************/
+      function canAfford(cost, state) {
+        return (
+          state.resources.production >= cost.production &&
+          state.resources.stability >= cost.stability
+        );
+      }
+
+      function build(type) {
+        const cost = BUILDING_COSTS[type];
+        if (!canAfford(cost, state)) return;
+
+        state.resources.production -= cost.production;
+        state.resources.stability -= cost.stability;
+        state.buildings[type]++;
+        saveState(state);
+        render(state);
       }
 
       /*************************************************
@@ -199,7 +238,7 @@ STATS
       render(state);
 
       /*************************************************
-       * DEBUG / RESET
+       * RESET
        *************************************************/
       function resetGame() {
         if (!confirm("Reset the world?")) return;
