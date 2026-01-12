@@ -2,24 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Idle Realm</title>
 
-    <!-- Pi Network SDK (MUST be here, before app code) -->
+    <!-- Pi SDK -->
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
   </head>
-
   <body>
     <div id="root"></div>
-
-    <!-- Pi domain validation (DO NOT REMOVE) -->
-    <!-- This forces Vite to include validation-key.txt in the build -->
-    <a href="/validation-key.txt" style="display: none"></a>
-
-    <!-- Vite entry -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
