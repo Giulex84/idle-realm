@@ -1,54 +1,32 @@
-export async function onRequest({ request, env }) {
-  const url = new URL(request.url);
+export const onRequestPost: PagesFunction = async (context) => {
+  const { request, env } = context;
 
-  // 1) Test semplice da browser: GET /api/pi?ping=1
-  if (request.method === "GET" && url.searchParams.get("ping") === "1") {
-    return new Response("PI FUNCTION OK", { status: 200 });
-  }
-
-  // 2) POST /api/pi (usato dal pagamento)
-  if (request.method !== "POST") {
-    return new Response("Method Not Allowed", { status: 405 });
-  }
-
-  let body: any;
   try {
-    body = await request.json();
-  } catch {
-    return new Response("Invalid JSON", { status: 400 });
+    const body = await request.json();
+    const { action, paymentId } = body;
+
+    if (!env.PI_API_KEY) {
+      return new Response("Missing PI_API_KEY", { status: 500 });
+    }
+
+    if (action === "approve") {
+      const res = await fetch(
+        `https://api.minepi.com/v2/payments/${paymentId}/complete`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Key ${env.PI_API_KEY}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+
+      const data = await res.text();
+      return new Response(data, { status: 200 });
+    }
+
+    return new Response("Unknown action", { status: 400 });
+  } catch (err) {
+    return new Response("Server error", { status: 500 });
   }
-
-  const { action, paymentId, txid } = body;
-
-  const key = env.PI_API_KEY;
-  if (!key) return new Response("NO_KEY", { status: 500 });
-  if (!paymentId) return new Response("NO_PAYMENT_ID", { status: 400 });
-
-  // APPROVE
-  if (action === "approve") {
-    const r = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/approve`, {
-      method: "POST",
-      headers: { Authorization: `Key ${key}` }
-    });
-    const text = await r.text();
-    return new Response(`APPROVE_${r.status}: ${text}`, { status: 200 });
-  }
-
-  // COMPLETE
-  if (action === "complete") {
-    if (!txid) return new Response("NO_TXID", { status: 400 });
-
-    const r = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/complete`, {
-      method: "POST",
-      headers: {
-        Authorization: `Key ${key}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ txid })
-    });
-    const text = await r.text();
-    return new Response(`COMPLETE_${r.status}: ${text}`, { status: 200 });
-  }
-
-  return new Response("BAD_ACTION", { status: 400 });
-}
+};
