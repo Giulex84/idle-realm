@@ -1,31 +1,38 @@
-export const onRequest: PagesFunction = async (context) => {
+export async function onRequest(context: any) {
   const { request, env } = context;
-
-  if (request.method === "GET") {
-    return new Response("PI FUNCTION OK", { status: 200 });
-  }
-
-  if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
-  }
-
-  if (!env.PI_API_KEY) {
-    return new Response("NO_API_KEY", { status: 500 });
-  }
-
   const body = await request.json();
 
-  const res = await fetch(
-    `https://api.minepi.com/v2/payments/${body.paymentId}/complete`,
-    {
-      method: "POST",
-      headers: {
-        "Authorization": `Key ${env.PI_API_KEY}`,
-        "Content-Type": "application/json"
-      }
-    }
-  );
+  const PI_API_KEY = env.PI_API_KEY;
+  if (!PI_API_KEY) {
+    return new Response("Missing PI_API_KEY", { status: 500 });
+  }
 
-  const text = await res.text();
-  return new Response(text, { status: res.status });
-};
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Key ${PI_API_KEY}`
+  };
+
+  // APPROVE
+  if (body.action === "approve") {
+    const res = await fetch(
+      `https://api.minepi.com/v2/payments/${body.paymentId}/approve`,
+      { method: "POST", headers }
+    );
+    return new Response("approved");
+  }
+
+  // COMPLETE
+  if (body.action === "complete") {
+    const res = await fetch(
+      `https://api.minepi.com/v2/payments/${body.paymentId}/complete`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ txid: body.txid })
+      }
+    );
+    return new Response("completed");
+  }
+
+  return new Response("invalid action", { status: 400 });
+}
