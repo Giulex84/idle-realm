@@ -1,128 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Idle Realm – Pi Payments</title>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Pi SDK Baseline</title>
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+</head>
+<body>
 
-    <!-- Pi SDK -->
-    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-    <script>
-      Pi.init({ version: "2.0" });
-    </script>
+<h1>Pi SDK Baseline</h1>
+<button onclick="login()">Login with Pi</button>
+<button onclick="pay()">Pay 1 Pi</button>
 
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        padding: 30px;
-      }
-      button {
-        padding: 12px 18px;
-        margin-top: 10px;
-        font-size: 16px;
-      }
-      #status {
-        margin-top: 20px;
-        font-weight: bold;
-      }
-    </style>
-  </head>
+<script>
+Pi.init({ version: "2.0" });
 
-  <body>
-    <h1>Idle Realm – Pi Payment Test</h1>
+function login() {
+  Pi.authenticate(["username"], (auth) => {
+    document.body.innerHTML += `<p>Welcome ${auth.user.username}</p>`;
+  });
+}
 
-    <button id="login">Login with Pi</button>
-    <br />
-    <button id="pay" disabled>Pay 1 Pi</button>
+function pay() {
+  Pi.createPayment({
+    amount: 1,
+    memo: "Test payment",
+    metadata: { test: true }
+  }, {
+    onReadyForServerApproval: async (paymentId) => {
+      await fetch("/api/pi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve",
+          paymentId
+        })
+      });
+    },
+    onCompleted: () => alert("Payment completed"),
+    onCancelled: () => alert("Payment cancelled"),
+    onError: e => alert(e)
+  });
+}
+</script>
 
-    <div id="status"></div>
-
-    <script>
-      let currentUser = null;
-
-      const scopes = ["username", "payments"];
-      const statusEl = document.getElementById("status");
-
-      // LOGIN
-      document.getElementById("login").onclick = async () => {
-        statusEl.innerText = "Authenticating with Pi...";
-
-        try {
-          const auth = await Pi.authenticate(scopes, () => {});
-          currentUser = auth.user;
-
-          statusEl.innerText =
-            "Logged in as " + currentUser.username;
-
-          document.getElementById("pay").disabled = false;
-        } catch (err) {
-          console.error(err);
-          statusEl.innerText = "Authentication failed";
-        }
-      };
-
-      // PAYMENT
-      document.getElementById("pay").onclick = async () => {
-        statusEl.innerText = "Creating payment...";
-
-        Pi.createPayment(
-          {
-            amount: 1,
-            memo: "Idle Realm – Test Payment",
-            metadata: {
-              app: "idle-realm",
-              item: "starter_pack"
-            }
-          },
-          {
-            // 🔥 STEP 1 — APPROVE (entro 60s)
-            onReadyForServerApproval: async (paymentId) => {
-              statusEl.innerText = "Approving payment...";
-
-              await fetch("/api/pi", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                  action: "approve",
-                  paymentId
-                })
-              });
-            },
-
-            // 🔥 STEP 2 — COMPLETE
-            onReadyForServerCompletion: async (paymentId, txid) => {
-              statusEl.innerText = "Completing payment...";
-
-              await fetch("/api/pi", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                  action: "complete",
-                  paymentId,
-                  txid
-                })
-              });
-            },
-
-            onComplete: (payment) => {
-              console.log("Payment complete", payment);
-              statusEl.innerText = "✅ Payment successful!";
-            },
-
-            onCancel: () => {
-              statusEl.innerText = "❌ Payment cancelled";
-            },
-
-            onError: (error) => {
-              console.error(error);
-              statusEl.innerText = "⚠️ Payment error";
-            }
-          }
-        );
-      };
-    </script>
-  </body>
+</body>
 </html>
