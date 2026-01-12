@@ -6,55 +6,66 @@
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
-  <h1>Pi SDK Baseline</h1>
 
-  <button id="loginBtn">Login with Pi</button>
-  <button id="payBtn" disabled>Pay 1 Pi</button>
+<h1>Pi SDK Baseline</h1>
 
-  <p id="status"></p>
+<button id="loginBtn">Login with Pi</button>
+<button id="payBtn" disabled>Pay 1 Pi</button>
+
+<p id="status"></p>
 
 <script>
   Pi.init({ version: "2.0" });
 
-  let user = null;
+  let currentUser = null;
 
   document.getElementById("loginBtn").onclick = async () => {
     try {
       const auth = await Pi.authenticate(["username"], () => {});
-      user = auth.user;
+      currentUser = auth.user;
       document.getElementById("status").innerText =
-        "Welcome: " + user.username;
+        "Welcome: " + currentUser.username;
       document.getElementById("payBtn").disabled = false;
-    } catch (e) {
+    } catch {
       document.getElementById("status").innerText = "Login failed";
     }
   };
 
-  document.getElementById("payBtn").onclick = async () => {
-    try {
-      const payment = await Pi.createPayment({
-        amount: 1,
-        memo: "Idle Realm Test Payment",
-        metadata: { reason: "test" }
-      });
+  document.getElementById("payBtn").onclick = () => {
+    Pi.createPayment({
+      amount: 1,
+      memo: "Idle Realm Test Payment",
+      metadata: { app: "idle-realm" },
 
-      // 🔴 QUESTO È IL PUNTO CRITICO
-      await fetch("/api/pi", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "approve",
-          paymentId: payment.identifier
-        })
-      });
+      onReadyForServerApproval: async (paymentId) => {
+        await fetch("/api/pi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "approve",
+            paymentId
+          })
+        });
+      },
 
-      document.getElementById("status").innerText =
-        "Payment approved";
-    } catch (e) {
-      document.getElementById("status").innerText =
-        "Payment failed";
-    }
+      onReadyForServerCompletion: async (paymentId, txid) => {
+        document.getElementById("status").innerText =
+          "Payment completed ✔️";
+      },
+
+      onCancel: () => {
+        document.getElementById("status").innerText =
+          "Payment cancelled";
+      },
+
+      onError: (err) => {
+        document.getElementById("status").innerText =
+          "Payment error";
+        console.error(err);
+      }
+    });
   };
 </script>
+
 </body>
 </html>
