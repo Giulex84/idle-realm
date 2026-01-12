@@ -23,6 +23,16 @@ header {
   border-bottom: 1px solid #1f2937;
 }
 
+header h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+header p {
+  margin: 4px 0 0;
+  color: #9ca3af;
+}
+
 main {
   padding: 16px;
   display: grid;
@@ -41,14 +51,14 @@ main {
   padding: 16px;
 }
 
+h2 {
+  margin-top: 0;
+}
+
 .stat {
   display: flex;
   justify-content: space-between;
   margin-bottom: 6px;
-}
-
-.stat span:last-child {
-  font-weight: 600;
 }
 
 button {
@@ -60,38 +70,48 @@ button {
   margin: 4px 4px 0 0;
 }
 
-button.selected {
-  background: #4f46e5;
+button:disabled {
+  background: #374151;
 }
 
-.map {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 6px;
 }
 
-.tile {
-  height: 54px;
-  border-radius: 10px;
-  border: 1px solid #1f2937;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.badge.good { background: #064e3b; }
+.badge.warn { background: #78350f; }
+.badge.bad  { background: #7f1d1d; }
+
+/* ===== CITY VISUAL ===== */
+.district {
+  margin-bottom: 10px;
+}
+
+.icons {
   font-size: 22px;
-  background: #020617;
+  word-break: break-all;
 }
 
-.tile.empty { cursor: pointer; }
-.tile.settlement { background: #1e293b; }
-.tile.workshop { background: #1f2937; }
-.tile.council { background: #312e81; }
-
+/* ===== EVENTS ===== */
 .event {
   background: #020617;
   border: 1px solid #1f2937;
   border-radius: 10px;
-  padding: 10px;
-  margin-bottom: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.event h4 {
+  margin: 0 0 6px 0;
+}
+
+.event button {
+  background: #374151;
+  font-size: 13px;
 }
 </style>
 </head>
@@ -103,44 +123,64 @@ button.selected {
 </header>
 
 <main>
+  <!-- REALM -->
   <div class="panel">
     <h2>Realm</h2>
-    <div class="stat"><span>Era</span><span id="eraValue"></span></div>
-    <div class="stat"><span>Population</span><span id="popValue"></span></div>
-    <div class="stat"><span>Production</span><span id="prodValue"></span></div>
-    <div class="stat"><span>Stability</span><span id="stabValue"></span></div>
+    <div class="stat"><span>Era</span><span id="era"></span></div>
+    <div class="stat"><span>Population</span><span id="pop"></span></div>
+    <div class="stat"><span>Production</span><span id="prod"></span></div>
+    <div class="stat"><span>Stability</span><span id="stab"></span></div>
+    <div id="realmState"></div>
 
     <h3>Build</h3>
-    <button id="b-settlement" onclick="selectBuild('settlement')">🏠 Settlement</button>
-    <button id="b-workshop" onclick="selectBuild('workshop')">⚒ Workshop</button>
-    <button id="b-council" onclick="selectBuild('council')">🏛 Council</button>
+    <button onclick="build('settlement')">🏠 Settlement</button>
+    <button onclick="build('workshop')">⚒ Workshop</button>
+    <button onclick="build('council')">🏛 Council</button>
   </div>
 
+  <!-- CITY -->
   <div class="panel">
-    <h2>World Map</h2>
-    <div class="map" id="map"></div>
+    <h2>City</h2>
+
+    <div class="district">
+      <strong>Residential District</strong>
+      <div class="icons" id="settlements"></div>
+    </div>
+
+    <div class="district">
+      <strong>Industrial District</strong>
+      <div class="icons" id="workshops"></div>
+    </div>
+
+    <div class="district">
+      <strong>Government District</strong>
+      <div class="icons" id="councils"></div>
+    </div>
   </div>
 
+  <!-- EVENTS -->
   <div class="panel">
     <h2>Events</h2>
     <div id="events"></div>
   </div>
 
+  <!-- META -->
   <div class="panel">
     <h2>Meta</h2>
-    <div class="stat"><span>Play time</span><span id="playValue"></span></div>
-    <div class="stat"><span>Ticks</span><span id="tickValue"></span></div>
+    <div class="stat"><span>Play time</span><span id="play"></span></div>
+    <div class="stat"><span>Ticks</span><span id="ticks"></span></div>
     <button onclick="resetGame()">Reset World</button>
   </div>
 </main>
 
 <script>
+/* ================= STATE ================= */
 var KEY = "idle_realm_save";
 
 var ERAS = [
-  { name: "Foundations", pop: 0.01, prod: 1.0, decay: 0.004 },
-  { name: "Expansion", pop: 0.015, prod: 1.2, decay: 0.006 },
-  { name: "Crisis", pop: 0.005, prod: 0.9, decay: 0.01 }
+  { name: "Foundations", pop: 0.01, prod: 1.0, decay: 0.003, desc: "A fragile but hopeful beginning." },
+  { name: "Expansion", pop: 0.015, prod: 1.2, decay: 0.005, desc: "Rapid growth fuels ambition and unrest." },
+  { name: "Crisis", pop: 0.005, prod: 0.9, decay: 0.01, desc: "Stability is threatened across the realm." }
 ];
 
 function defaultState() {
@@ -149,8 +189,8 @@ function defaultState() {
     pop: 10,
     prod: 20,
     stab: 70,
-    map: Array(49).fill(null),
     buildings: { settlement: 1, workshop: 0, council: 0 },
+    events: [],
     last: Date.now(),
     ticks: 0,
     play: 0
@@ -159,12 +199,8 @@ function defaultState() {
 
 var saved = localStorage.getItem(KEY);
 var state = saved ? JSON.parse(saved) : defaultState();
-var selected = null;
 
-function save() {
-  localStorage.setItem(KEY, JSON.stringify(state));
-}
-
+/* ================= CORE LOOP ================= */
 function loop() {
   var now = Date.now();
   var sec = Math.min((now - state.last) / 1000, 86400);
@@ -177,55 +213,104 @@ function loop() {
   state.stab -= era.decay * sec;
 
   state.stab = Math.max(0, Math.min(100, state.stab));
+
   if (state.pop > 80) state.era = 2;
   else if (state.pop > 30) state.era = 1;
+
+  if (Math.random() < sec * 0.00015) createEvent();
 
   state.last = now;
   state.ticks += sec;
   state.play += sec;
 
+  save();
+  render();
+}
+
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(state));
+}
+
+/* ================= BUILD ================= */
+function build(type) {
+  var cost = { settlement: 25, workshop: 40, council: 60 }[type];
+  if (state.prod < cost) return;
+
+  state.prod -= cost;
+  state.buildings[type]++;
   render();
   save();
 }
 
-function selectBuild(type) {
-  selected = type;
-  ["settlement","workshop","council"].forEach(function(t){
-    document.getElementById("b-"+t).classList.toggle("selected", t === type);
-  });
+/* ================= EVENTS ================= */
+function createEvent() {
+  var bad = state.stab < 40;
+  var e = bad ? {
+    title: "Civil Unrest",
+    text: "Tensions rise among the population.",
+    choices: [
+      { label: "Repress", effect: function(){ state.stab += 5; } },
+      { label: "Reform", effect: function(){ state.pop -= 1; } }
+    ]
+  } : {
+    title: "Trade Opportunity",
+    text: "Merchants bring new wealth.",
+    choices: [
+      { label: "Tax Trade", effect: function(){ state.prod += 20; } },
+      { label: "Welcome Migrants", effect: function(){ state.pop += 2; } }
+    ]
+  };
+
+  state.events.unshift(e);
+  state.events = state.events.slice(0, 3);
 }
 
-function place(i) {
-  if (!selected || state.map[i]) return;
-  state.map[i] = selected;
-  state.buildings[selected]++;
-  selected = null;
-  render();
-}
-
+/* ================= RENDER ================= */
 function render() {
-  document.getElementById("eraValue").innerText = ERAS[state.era].name;
-  document.getElementById("popValue").innerText = state.pop.toFixed(1);
-  document.getElementById("prodValue").innerText = state.prod.toFixed(1);
-  document.getElementById("stabValue").innerText = state.stab.toFixed(1);
-  document.getElementById("playValue").innerText = Math.floor(state.play/60) + " min";
-  document.getElementById("tickValue").innerText = Math.floor(state.ticks);
+  document.getElementById("era").innerText = ERAS[state.era].name;
+  document.getElementById("pop").innerText = state.pop.toFixed(1);
+  document.getElementById("prod").innerText = state.prod.toFixed(1);
+  document.getElementById("stab").innerText = state.stab.toFixed(1);
+  document.getElementById("play").innerText = Math.floor(state.play/60) + " min";
+  document.getElementById("ticks").innerText = Math.floor(state.ticks);
 
-  var map = document.getElementById("map");
-  map.innerHTML = "";
-  state.map.forEach(function(c,i){
+  var badge = "";
+  if (state.stab > 70) badge = '<span class="badge good">Prosperous Realm</span>';
+  else if (state.stab > 40) badge = '<span class="badge warn">Strained Society</span>';
+  else badge = '<span class="badge bad">Unstable Realm</span>';
+  document.getElementById("realmState").innerHTML = badge + "<p>" + ERAS[state.era].desc + "</p>";
+
+  document.getElementById("settlements").innerText = "🏠".repeat(state.buildings.settlement);
+  document.getElementById("workshops").innerText = "⚒".repeat(state.buildings.workshop);
+  document.getElementById("councils").innerText = "🏛".repeat(state.buildings.council);
+
+  var ev = document.getElementById("events");
+  ev.innerHTML = "";
+  state.events.forEach(function(e, idx){
     var d = document.createElement("div");
-    d.className = "tile " + (c || "empty");
-    d.innerText = c ? ({settlement:"🏠",workshop:"⚒",council:"🏛"}[c]) : "";
-    d.onclick = function(){ place(i); };
-    map.appendChild(d);
+    d.className = "event";
+    d.innerHTML = "<h4>"+e.title+"</h4><p>"+e.text+"</p>";
+    e.choices.forEach(function(c){
+      var b = document.createElement("button");
+      b.innerText = c.label;
+      b.onclick = function(){
+        c.effect();
+        state.events.splice(idx,1);
+        save();
+        render();
+      };
+      d.appendChild(b);
+    });
+    ev.appendChild(d);
   });
 }
 
+/* ================= RESET ================= */
 function resetGame() {
   if (!confirm("Reset the realm?")) return;
   localStorage.removeItem(KEY);
   state = defaultState();
+  save();
   render();
 }
 
