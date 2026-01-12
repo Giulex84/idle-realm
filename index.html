@@ -6,48 +6,29 @@
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
-  <h1>Pi SDK Baseline</h1>
 
-  <button id="login">Login with Pi</button>
-  <button id="pay">Pay 1 Pi</button>
+<h1>Pi SDK Baseline</h1>
 
-  <p id="status"></p>
+<button onclick="login()">Login with Pi</button>
 
-  <script>
-    document.getElementById("login").onclick = () => {
-      if (!window.Pi) {
-        document.getElementById("status").innerText = "Pi SDK NOT loaded";
-        return;
-      }
+<p id="out"></p>
 
-      Pi.authenticate(["username"], (auth) => {
-        document.getElementById("status").innerText =
-          "Logged as " + auth.user.username;
-      }, console.error);
-    };
+<script>
+  function login() {
+    if (!window.Pi) {
+      document.getElementById("out").innerText = "Pi SDK NOT LOADED";
+      return;
+    }
 
-    document.getElementById("pay").onclick = async () => {
-      try {
-        const payment = await Pi.createPayment({
-          amount: 1,
-          memo: "Test payment"
-        });
+    Pi.authenticate(["username"], function(auth) {
+      document.getElementById("out").innerText =
+        "Logged in as " + auth.user.username;
+    }, function(err) {
+      document.getElementById("out").innerText = "Auth error";
+      console.error(err);
+    });
+  }
+</script>
 
-        await fetch("/api/pi", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "approve",
-            paymentId: payment.identifier
-          })
-        });
-
-        document.getElementById("status").innerText = "Payment completed";
-      } catch (e) {
-        document.getElementById("status").innerText = "Payment failed";
-        console.error(e);
-      }
-    };
-  </script>
 </body>
 </html>
