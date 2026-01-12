@@ -1,29 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Pi SDK Baseline</title>
+  <meta charset="UTF-8">
+  <title>Pi SDK Test</title>
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
   <h1>Pi SDK Baseline</h1>
 
-  <button onclick="login()">Login with Pi</button>
-  <button onclick="pay()">Pay 1 Pi</button>
+  <button id="login">Login with Pi</button>
+  <button id="pay">Pay 1 Pi</button>
 
   <p id="status"></p>
 
   <script>
-    Pi.init({ version: "2.0" });
+    document.getElementById("login").onclick = () => {
+      if (!window.Pi) {
+        document.getElementById("status").innerText = "Pi SDK NOT loaded";
+        return;
+      }
 
-    function login() {
       Pi.authenticate(["username"], (auth) => {
         document.getElementById("status").innerText =
           "Logged as " + auth.user.username;
       }, console.error);
-    }
+    };
 
-    async function pay() {
+    document.getElementById("pay").onclick = async () => {
       try {
         const payment = await Pi.createPayment({
           amount: 1,
@@ -44,7 +47,7 @@
         document.getElementById("status").innerText = "Payment failed";
         console.error(e);
       }
-    }
+    };
   </script>
 </body>
 </html>
