@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Idle Realm</title>
 
-    <!-- PI SDK -->
+    <!-- Pi SDK (auth resta, ma qui non lo usiamo ancora) -->
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     <script>
       Pi.init({ version: "2.0" });
@@ -13,126 +13,201 @@
     <style>
       body {
         font-family: system-ui, -apple-system, BlinkMacSystemFont;
+        background: #111;
+        color: #eee;
         padding: 24px;
       }
-      button {
-        padding: 10px 14px;
-        margin: 6px 6px 6px 0;
-        cursor: pointer;
+
+      h1 {
+        margin-bottom: 10px;
       }
-      #log {
-        margin-top: 20px;
-        white-space: pre-wrap;
-        background: #f4f4f4;
-        padding: 12px;
+
+      pre {
+        background: #1e1e1e;
+        padding: 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+
+      button {
+        margin-top: 16px;
+        padding: 10px 14px;
         border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        background: #3a6df0;
+        color: white;
+        font-size: 14px;
+      }
+
+      button:hover {
+        background: #2f5bd3;
       }
     </style>
   </head>
 
   <body>
-    <!-- ================= GOLDEN AUTH ================= -->
-    <button id="login">Login with Pi</button>
+    <h1>Idle Realm</h1>
+    <p>Local-first idle world simulation</p>
 
-    <!-- ================= PAYMENTS (ISOLATI) ================= -->
-    <div style="margin-top:20px;">
-      <button id="enablePayments" disabled>Enable Payments</button>
-      <button id="payTest" disabled>Create Test Payment</button>
-    </div>
+    <pre id="output">loading...</pre>
 
-    <div id="log">ready</div>
+    <button onclick="resetGame()">Reset World</button>
 
     <script>
-      const logEl = document.getElementById("log");
-      const log = (...args) => {
-        logEl.textContent = args
-          .map(a => typeof a === "string" ? a : JSON.stringify(a, null, 2))
-          .join("\n");
-        console.log(...args);
+      /*************************************************
+       * CONFIG
+       *************************************************/
+      const STORAGE_KEY = "idle_realm_save";
+
+      const DEFAULT_STATE = {
+        meta: {
+          version: 1,
+          createdAt: Date.now(),
+          lastTick: Date.now()
+        },
+
+        realm: {
+          name: "Idle Realm",
+          era: "foundations"
+        },
+
+        resources: {
+          population: 10,
+          production: 5,
+          stability: 70
+        },
+
+        buildings: {
+          settlement: 1,
+          workshop: 0,
+          council: 0
+        },
+
+        modifiers: {
+          productionBonus: 1.0,
+          stabilityBonus: 1.0
+        },
+
+        stats: {
+          totalPlayTime: 0,
+          ticks: 0
+        }
       };
 
-      function onIncompletePaymentFound(payment) {
-        log("Incomplete payment found", payment);
+      /*************************************************
+       * LOAD / SAVE
+       *************************************************/
+      function loadState() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return structuredClone(DEFAULT_STATE);
+
+        try {
+          const parsed = JSON.parse(raw);
+          return migrateState(parsed);
+        } catch {
+          return structuredClone(DEFAULT_STATE);
+        }
       }
 
-      // ===== GOLDEN AUTH (INTOCCABILE) =====
-      const scopes = ["username"];
-      let user = null;
-
-      document.getElementById("login").onclick = async () => {
-        try {
-          const auth = await Pi.authenticate(scopes, onIncompletePaymentFound);
-          user = auth.user;
-
-          document.body.insertAdjacentHTML(
-            "beforeend",
-            `<h2>Welcome ${user.username}</h2>
-             <p>User authenticated correctly.</p>`
-          );
-
-          document.getElementById("enablePayments").disabled = false;
-          log("AUTH OK", user.username);
-        } catch (e) {
-          alert("Authentication failed");
-          log("AUTH ERROR", e);
-        }
-      };
-
-      // ===== PAYMENTS SCOPE =====
-      let paymentsEnabled = false;
-
-      document.getElementById("enablePayments").onclick = async () => {
-        try {
-          await Pi.authenticate(["payments"], onIncompletePaymentFound);
-          paymentsEnabled = true;
-          document.getElementById("payTest").disabled = false;
-          log("PAYMENTS ENABLED");
-        } catch (e) {
-          alert("Payments permission failed");
-          log(e);
-        }
-      };
-
-      async function callApi(body) {
-        const res = await fetch("/api/pi", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-          throw new Error(JSON.stringify(data));
-        }
-        return data;
+      function saveState(state) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
 
-      // ===== CREATE PAYMENT =====
-      document.getElementById("payTest").onclick = async () => {
-        if (!user || !paymentsEnabled) return;
+      function migrateState(state) {
+        if (!state.meta || state.meta.version !== 1) {
+          return structuredClone(DEFAULT_STATE);
+        }
+        return state;
+      }
 
-        const paymentData = {
-          amount: 0.01,
-          memo: "Idle Realm Test Payment",
-          metadata: { sku: "test_boost_001" }
-        };
+      /*************************************************
+       * TIME SIMULATION (IDLE CORE)
+       *************************************************/
+      function applyTime(state) {
+        const now = Date.now();
+        const elapsedMs = now - state.meta.lastTick;
+        const elapsedSeconds = Math.floor(elapsedMs / 1000);
 
-        const callbacks = {
-          onReadyForServerApproval: async (paymentId) => {
-            log("APPROVING", paymentId);
-            await callApi({ action: "approve", paymentId });
-            log("APPROVED");
-          },
-          onReadyForServerCompletion: async (paymentId, txid) => {
-            log("COMPLETING", paymentId, txid);
-            await callApi({ action: "complete", paymentId, txid });
-            alert("Payment completed");
-          },
-          onCancel: (paymentId) => log("CANCELLED", paymentId),
-          onError: (err) => log("ERROR", err)
-        };
+        if (elapsedSeconds <= 0) return state;
 
-        await Pi.createPayment(paymentData, callbacks);
-      };
+        // Production grows with population
+        const productionRate =
+          state.resources.population *
+          0.1 *
+          state.modifiers.productionBonus;
+
+        state.resources.production += productionRate * elapsedSeconds;
+
+        // Population grows slowly if stable
+        if (state.resources.stability > 50) {
+          state.resources.population += elapsedSeconds * 0.01;
+        }
+
+        // Stability slowly decays
+        state.resources.stability -= elapsedSeconds * 0.005;
+
+        // Clamp stability
+        state.resources.stability = Math.max(
+          0,
+          Math.min(100, state.resources.stability)
+        );
+
+        state.meta.lastTick = now;
+        state.stats.ticks += elapsedSeconds;
+        state.stats.totalPlayTime += elapsedSeconds;
+
+        return state;
+      }
+
+      /*************************************************
+       * RENDER
+       *************************************************/
+      function render(state) {
+        document.getElementById("output").innerText = `
+ERA: ${state.realm.era}
+
+RESOURCES
+- Population : ${state.resources.population.toFixed(1)}
+- Production : ${state.resources.production.toFixed(1)}
+- Stability  : ${state.resources.stability.toFixed(1)}
+
+BUILDINGS
+- Settlement : ${state.buildings.settlement}
+- Workshop   : ${state.buildings.workshop}
+- Council    : ${state.buildings.council}
+
+STATS
+- Play time  : ${Math.floor(state.stats.totalPlayTime / 60)} min
+- Ticks      : ${state.stats.ticks}
+`;
+      }
+
+      /*************************************************
+       * GAME LOOP
+       *************************************************/
+      let state = loadState();
+
+      function gameLoop() {
+        state = applyTime(state);
+        saveState(state);
+        render(state);
+      }
+
+      setInterval(gameLoop, 1000);
+      render(state);
+
+      /*************************************************
+       * DEBUG / RESET
+       *************************************************/
+      function resetGame() {
+        if (!confirm("Reset the world?")) return;
+        localStorage.removeItem(STORAGE_KEY);
+        state = structuredClone(DEFAULT_STATE);
+        saveState(state);
+        render(state);
+      }
     </script>
   </body>
 </html>
