@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <title>Idle Realm</title>
 
+<!-- PI SDK – NON TOCCARE -->
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 <script>
   Pi.init({ version: "2.0" });
@@ -30,13 +31,11 @@ main {
 }
 
 @media (min-width: 900px) {
-  main {
-    grid-template-columns: 1fr 1fr;
-  }
+  main { grid-template-columns: 1fr 1fr; }
 }
 
 .panel {
-  background: rgba(17, 24, 39, 0.95);
+  background: rgba(17,24,39,0.95);
   border: 1px solid #1f2937;
   border-radius: 14px;
   padding: 16px;
@@ -82,10 +81,7 @@ button.selected {
   background: #020617;
 }
 
-.tile.empty {
-  cursor: pointer;
-}
-
+.tile.empty { cursor: pointer; }
 .tile.settlement { background: #1e293b; }
 .tile.workshop { background: #1f2937; }
 .tile.council { background: #312e81; }
@@ -102,44 +98,45 @@ button.selected {
 
 <body>
 <header>
-<h1>Idle Realm</h1>
-<p>A living world shaped by time and eras</p>
+  <h1>Idle Realm</h1>
+  <p>A living world shaped by time and eras</p>
 </header>
 
 <main>
-<div class="panel">
-<h2>Realm</h2>
-<div class="stat"><span>Era</span><span id="era"></span></div>
-<div class="stat"><span>Population</span><span id="population"></span></div>
-<div class="stat"><span>Production</span><span id="production"></span></div>
-<div class="stat"><span>Stability</span><span id="stability"></span></div>
+  <div class="panel">
+    <h2>Realm</h2>
+    <div class="stat"><span>Era</span><span id="eraValue"></span></div>
+    <div class="stat"><span>Population</span><span id="popValue"></span></div>
+    <div class="stat"><span>Production</span><span id="prodValue"></span></div>
+    <div class="stat"><span>Stability</span><span id="stabValue"></span></div>
 
-<h3>Build</h3>
-<button onclick="selectBuild('settlement')" id="btn-settlement">🏠 Settlement</button>
-<button onclick="selectBuild('workshop')" id="btn-workshop">⚒ Workshop</button>
-<button onclick="selectBuild('council')" id="btn-council">🏛 Council</button>
-</div>
+    <h3>Build</h3>
+    <button id="b-settlement" onclick="selectBuild('settlement')">🏠 Settlement</button>
+    <button id="b-workshop" onclick="selectBuild('workshop')">⚒ Workshop</button>
+    <button id="b-council" onclick="selectBuild('council')">🏛 Council</button>
+  </div>
 
-<div class="panel">
-<h2>World Map</h2>
-<div class="map" id="map"></div>
-</div>
+  <div class="panel">
+    <h2>World Map</h2>
+    <div class="map" id="map"></div>
+  </div>
 
-<div class="panel">
-<h2>Events</h2>
-<div id="events"></div>
-</div>
+  <div class="panel">
+    <h2>Events</h2>
+    <div id="events"></div>
+  </div>
 
-<div class="panel">
-<h2>Meta</h2>
-<div class="stat"><span>Play time</span><span id="playtime"></span></div>
-<div class="stat"><span>Ticks</span><span id="ticks"></span></div>
-<button onclick="resetGame()">Reset World</button>
-</div>
+  <div class="panel">
+    <h2>Meta</h2>
+    <div class="stat"><span>Play time</span><span id="playValue"></span></div>
+    <div class="stat"><span>Ticks</span><span id="tickValue"></span></div>
+    <button onclick="resetGame()">Reset World</button>
+  </div>
 </main>
 
 <script>
-const STORAGE_KEY = "idle_realm_save";
+/* ================= STATE ================= */
+const KEY = "idle_realm_save";
 
 const ERAS = [
   { name: "Foundations", pop: 0.01, prod: 1.0, decay: 0.004 },
@@ -159,11 +156,12 @@ const DEFAULT = {
   play: 0
 };
 
-let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || structuredClone(DEFAULT);
+let state = JSON.parse(localStorage.getItem(KEY)) || structuredClone(DEFAULT);
 let selected = null;
 
+/* ================= CORE ================= */
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(KEY, JSON.stringify(state));
 }
 
 function loop() {
@@ -173,13 +171,13 @@ function loop() {
 
   const era = ERAS[state.era];
 
-  state.prod += (state.pop * 0.1 * era.prod) * sec;
-  if (state.stab > 40) state.pop += sec * era.pop;
-  state.stab -= sec * era.decay;
-  state.stab = Math.max(0, Math.min(100, state.stab));
+  state.prod += state.pop * 0.1 * era.prod * sec;
+  if (state.stab > 40) state.pop += era.pop * sec;
+  state.stab -= era.decay * sec;
 
-  if (state.pop > 30) state.era = 1;
+  state.stab = Math.max(0, Math.min(100, state.stab));
   if (state.pop > 80) state.era = 2;
+  else if (state.pop > 30) state.era = 1;
 
   state.last = now;
   state.ticks += sec;
@@ -189,10 +187,11 @@ function loop() {
   save();
 }
 
-function selectBuild(t) {
-  selected = t;
-  ["settlement","workshop","council"].forEach(x=>{
-    document.getElementById("btn-"+x).classList.toggle("selected",x===t);
+/* ================= BUILD ================= */
+function selectBuild(type) {
+  selected = type;
+  ["settlement","workshop","council"].forEach(t=>{
+    document.getElementById("b-"+t).classList.toggle("selected", t===type);
   });
 }
 
@@ -201,32 +200,38 @@ function place(i) {
   state.map[i] = selected;
   state.buildings[selected]++;
   selected = null;
+  render();
 }
 
+/* ================= RENDER ================= */
 function render() {
-  era.innerText = ERAS[state.era].name;
-  population.innerText = state.pop.toFixed(1);
-  production.innerText = state.prod.toFixed(1);
-  stability.innerText = state.stab.toFixed(1);
-  playtime.innerText = Math.floor(state.play/60)+" min";
-  ticks.innerText = Math.floor(state.ticks);
+  document.getElementById("eraValue").innerText = ERAS[state.era].name;
+  document.getElementById("popValue").innerText = state.pop.toFixed(1);
+  document.getElementById("prodValue").innerText = state.prod.toFixed(1);
+  document.getElementById("stabValue").innerText = state.stab.toFixed(1);
+  document.getElementById("playValue").innerText = Math.floor(state.play/60) + " min";
+  document.getElementById("tickValue").innerText = Math.floor(state.ticks);
 
+  const map = document.getElementById("map");
   map.innerHTML = "";
   state.map.forEach((c,i)=>{
-    const d=document.createElement("div");
-    d.className="tile "+(c||"empty");
-    d.innerText=c?({settlement:"🏠",workshop:"⚒",council:"🏛"}[c]):"";
-    d.onclick=()=>place(i);
+    const d = document.createElement("div");
+    d.className = "tile " + (c || "empty");
+    d.innerText = c ? ({settlement:"🏠",workshop:"⚒",council:"🏛"}[c]) : "";
+    d.onclick = () => place(i);
     map.appendChild(d);
   });
 }
 
+/* ================= RESET ================= */
 function resetGame() {
-  localStorage.removeItem(STORAGE_KEY);
+  if (!confirm("Reset the realm?")) return;
+  localStorage.removeItem(KEY);
   state = structuredClone(DEFAULT);
+  render();
 }
 
-setInterval(loop,1000);
+setInterval(loop, 1000);
 render();
 </script>
 </body>
