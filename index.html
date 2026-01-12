@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Pi SDK Auth + Payments Baseline</title>
+    <title>Idle Realm – Pi Payments</title>
 
     <!-- Pi SDK -->
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
@@ -13,88 +13,115 @@
     <style>
       body {
         font-family: Arial, sans-serif;
-        padding: 40px;
+        padding: 30px;
       }
       button {
-        padding: 12px 20px;
-        margin: 10px 0;
+        padding: 12px 18px;
+        margin-top: 10px;
         font-size: 16px;
+      }
+      #status {
+        margin-top: 20px;
+        font-weight: bold;
       }
     </style>
   </head>
 
   <body>
-    <h1>Pi SDK Baseline</h1>
+    <h1>Idle Realm – Pi Payment Test</h1>
 
     <button id="login">Login with Pi</button>
+    <br />
     <button id="pay" disabled>Pay 1 Pi</button>
 
-    <div id="output"></div>
+    <div id="status"></div>
 
     <script>
       let currentUser = null;
 
       const scopes = ["username", "payments"];
+      const statusEl = document.getElementById("status");
 
       // LOGIN
       document.getElementById("login").onclick = async () => {
+        statusEl.innerText = "Authenticating with Pi...";
+
         try {
           const auth = await Pi.authenticate(scopes, () => {});
           currentUser = auth.user;
 
-          document.getElementById("pay").disabled = false;
+          statusEl.innerText =
+            "Logged in as " + currentUser.username;
 
-          document.getElementById("output").innerHTML = `
-            <p><strong>Welcome:</strong> ${currentUser.username}</p>
-            <p>User authenticated correctly.</p>
-          `;
+          document.getElementById("pay").disabled = false;
         } catch (err) {
           console.error(err);
-          alert("Authentication failed");
+          statusEl.innerText = "Authentication failed";
         }
       };
 
       // PAYMENT
       document.getElementById("pay").onclick = async () => {
-        const paymentData = {
-          amount: 1,
-          memo: "Idle Realm – Testnet Purchase",
-          metadata: {
-            app: "idle-realm",
-            item: "starter_pack"
-          }
-        };
+        statusEl.innerText = "Creating payment...";
 
-        try {
-          await Pi.createPayment(paymentData, {
-            onReadyForServerApproval: (paymentId) => {
-              console.log("Ready for server approval:", paymentId);
-              // futuro: chiamata backend
+        Pi.createPayment(
+          {
+            amount: 1,
+            memo: "Idle Realm – Test Payment",
+            metadata: {
+              app: "idle-realm",
+              item: "starter_pack"
+            }
+          },
+          {
+            // 🔥 STEP 1 — APPROVE (entro 60s)
+            onReadyForServerApproval: async (paymentId) => {
+              statusEl.innerText = "Approving payment...";
+
+              await fetch("/api/pi", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  action: "approve",
+                  paymentId
+                })
+              });
             },
 
-            onReadyForServerCompletion: (paymentId, txid) => {
-              console.log("Ready for server completion:", paymentId, txid);
-              // futuro: conferma backend
+            // 🔥 STEP 2 — COMPLETE
+            onReadyForServerCompletion: async (paymentId, txid) => {
+              statusEl.innerText = "Completing payment...";
+
+              await fetch("/api/pi", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  action: "complete",
+                  paymentId,
+                  txid
+                })
+              });
             },
 
             onComplete: (payment) => {
-              console.log("Payment completed:", payment);
-              alert("✅ Payment successful!");
+              console.log("Payment complete", payment);
+              statusEl.innerText = "✅ Payment successful!";
             },
 
-            onCancel: (payment) => {
-              console.log("Payment cancelled:", payment);
-              alert("❌ Payment cancelled");
+            onCancel: () => {
+              statusEl.innerText = "❌ Payment cancelled";
             },
 
-            onError: (error, payment) => {
-              console.error("Payment error:", error, payment);
-              alert("⚠️ Payment error");
+            onError: (error) => {
+              console.error(error);
+              statusEl.innerText = "⚠️ Payment error";
             }
-          });
-        } catch (err) {
-          console.error(err);
-        }
+          }
+        );
       };
     </script>
   </body>
