@@ -4,20 +4,77 @@
   <meta charset="UTF-8" />
   <title>Pi SDK Baseline</title>
 
-  <!-- PI SDK -->
+  <!-- Pi SDK -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 40px;
+  <script>
+    let currentUser = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      Pi.init({ version: "2.0" });
+    });
+
+    function login() {
+      Pi.authenticate(
+        ["username"],
+        (auth) => {
+          currentUser = auth.user;
+          document.getElementById("user").innerText =
+            "Welcome: " + currentUser.username;
+        },
+        (err) => {
+          console.error("Login error", err);
+        }
+      );
     }
-    button {
-      margin-right: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
+
+    function pay() {
+      if (!currentUser) {
+        alert("Login first");
+        return;
+      }
+
+      Pi.createPayment(
+        {
+          amount: 1,
+          memo: "Test payment",
+          metadata: { purpose: "test" }
+        },
+        {
+          onReadyForServerApproval: function (paymentId) {
+            fetch("/api/pi", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "approve",
+                paymentId
+              })
+            });
+          },
+
+          onReadyForServerCompletion: function (paymentId, txid) {
+            fetch("/api/pi", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "complete",
+                paymentId,
+                txid
+              })
+            });
+          },
+
+          onCancel: function (paymentId) {
+            console.log("Payment cancelled", paymentId);
+          },
+
+          onError: function (error, payment) {
+            console.error("Payment error", error, payment);
+          }
+        }
+      );
     }
-  </style>
+  </script>
 </head>
 
 <body>
@@ -26,83 +83,6 @@
   <button onclick="login()">Login with Pi</button>
   <button onclick="pay()">Pay 1 Pi</button>
 
-  <p id="status"></p>
-
-  <script>
-    // ⚠️ OBBLIGATORIO
-    Pi.init({ version: "2.0" });
-
-    let currentUser = null;
-
-    async function login() {
-      try {
-        const auth = await Pi.authenticate(["username"], onIncompletePaymentFound);
-        currentUser = auth.user.username;
-        document.getElementById("status").innerText =
-          "Welcome: " + currentUser;
-      } catch (err) {
-        document.getElementById("status").innerText =
-          "Login failed";
-        console.error(err);
-      }
-    }
-
-    async function pay() {
-      if (!currentUser) {
-        alert("Login first");
-        return;
-      }
-
-      try {
-        await Pi.createPayment({
-          amount: 1,
-          memo: "Test payment",
-          metadata: { app: "idle-realm" }
-        }, {
-          onReadyForServerApproval,
-          onReadyForServerCompletion,
-          onCancel,
-          onError
-        });
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    function onReadyForServerApproval(paymentId) {
-      fetch("/api/pi", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "approve",
-          paymentId
-        })
-      });
-    }
-
-    function onReadyForServerCompletion(paymentId, txid) {
-      fetch("/api/pi", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "complete",
-          paymentId,
-          txid
-        })
-      });
-    }
-
-    function onIncompletePaymentFound(payment) {
-      console.log("Incomplete payment", payment);
-    }
-
-    function onCancel() {
-      alert("Payment cancelled");
-    }
-
-    function onError(err) {
-      console.error(err);
-    }
-  </script>
+  <p id="user"></p>
 </body>
 </html>
