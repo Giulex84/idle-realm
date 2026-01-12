@@ -1,38 +1,137 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Pi SDK Baseline</title>
+    <title>Idle Realm</title>
 
+    <!-- PI SDK -->
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     <script>
       Pi.init({ version: "2.0" });
     </script>
+
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont;
+        padding: 24px;
+      }
+      button {
+        padding: 10px 14px;
+        margin: 6px 6px 6px 0;
+        cursor: pointer;
+      }
+      #log {
+        margin-top: 20px;
+        white-space: pre-wrap;
+        background: #f4f4f4;
+        padding: 12px;
+        border-radius: 6px;
+      }
+    </style>
   </head>
 
   <body>
+    <!-- ================= GOLDEN AUTH ================= -->
     <button id="login">Login with Pi</button>
 
+    <!-- ================= PAYMENTS (ISOLATI) ================= -->
+    <div style="margin-top:20px;">
+      <button id="enablePayments" disabled>Enable Payments</button>
+      <button id="payTest" disabled>Create Test Payment</button>
+    </div>
+
+    <div id="log">ready</div>
+
     <script>
+      const logEl = document.getElementById("log");
+      const log = (...args) => {
+        logEl.textContent = args
+          .map(a => typeof a === "string" ? a : JSON.stringify(a, null, 2))
+          .join("\n");
+        console.log(...args);
+      };
+
+      function onIncompletePaymentFound(payment) {
+        log("Incomplete payment found", payment);
+      }
+
+      // ===== GOLDEN AUTH (INTOCCABILE) =====
       const scopes = ["username"];
+      let user = null;
 
       document.getElementById("login").onclick = async () => {
         try {
-          const auth = await Pi.authenticate(scopes, (payment) => {
-            console.log("Incomplete payment", payment);
-          });
+          const auth = await Pi.authenticate(scopes, onIncompletePaymentFound);
+          user = auth.user;
 
-          console.log("AUTH SUCCESS", auth);
+          document.body.insertAdjacentHTML(
+            "beforeend",
+            `<h2>Welcome ${user.username}</h2>
+             <p>User authenticated correctly.</p>`
+          );
 
-          document.body.innerHTML = `
-            <h2>Welcome ${auth.user.username}</h2>
-            <p>User authenticated correctly.</p>
-          `;
-        } catch (err) {
-          console.error("AUTH ERROR", err);
+          document.getElementById("enablePayments").disabled = false;
+          log("AUTH OK", user.username);
+        } catch (e) {
           alert("Authentication failed");
+          log("AUTH ERROR", e);
         }
+      };
+
+      // ===== PAYMENTS SCOPE =====
+      let paymentsEnabled = false;
+
+      document.getElementById("enablePayments").onclick = async () => {
+        try {
+          await Pi.authenticate(["payments"], onIncompletePaymentFound);
+          paymentsEnabled = true;
+          document.getElementById("payTest").disabled = false;
+          log("PAYMENTS ENABLED");
+        } catch (e) {
+          alert("Payments permission failed");
+          log(e);
+        }
+      };
+
+      async function callApi(body) {
+        const res = await fetch("/api/pi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(JSON.stringify(data));
+        }
+        return data;
+      }
+
+      // ===== CREATE PAYMENT =====
+      document.getElementById("payTest").onclick = async () => {
+        if (!user || !paymentsEnabled) return;
+
+        const paymentData = {
+          amount: 0.01,
+          memo: "Idle Realm Test Payment",
+          metadata: { sku: "test_boost_001" }
+        };
+
+        const callbacks = {
+          onReadyForServerApproval: async (paymentId) => {
+            log("APPROVING", paymentId);
+            await callApi({ action: "approve", paymentId });
+            log("APPROVED");
+          },
+          onReadyForServerCompletion: async (paymentId, txid) => {
+            log("COMPLETING", paymentId, txid);
+            await callApi({ action: "complete", paymentId, txid });
+            alert("Payment completed");
+          },
+          onCancel: (paymentId) => log("CANCELLED", paymentId),
+          onError: (err) => log("ERROR", err)
+        };
+
+        await Pi.createPayment(paymentData, callbacks);
       };
     </script>
   </body>
