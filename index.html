@@ -135,41 +135,42 @@ button.selected {
 </main>
 
 <script>
-/* ================= STATE ================= */
-const KEY = "idle_realm_save";
+var KEY = "idle_realm_save";
 
-const ERAS = [
+var ERAS = [
   { name: "Foundations", pop: 0.01, prod: 1.0, decay: 0.004 },
   { name: "Expansion", pop: 0.015, prod: 1.2, decay: 0.006 },
   { name: "Crisis", pop: 0.005, prod: 0.9, decay: 0.01 }
 ];
 
-const DEFAULT = {
-  era: 0,
-  pop: 10,
-  prod: 20,
-  stab: 70,
-  map: Array(49).fill(null),
-  buildings: { settlement: 1, workshop: 0, council: 0 },
-  last: Date.now(),
-  ticks: 0,
-  play: 0
-};
+function defaultState() {
+  return {
+    era: 0,
+    pop: 10,
+    prod: 20,
+    stab: 70,
+    map: Array(49).fill(null),
+    buildings: { settlement: 1, workshop: 0, council: 0 },
+    last: Date.now(),
+    ticks: 0,
+    play: 0
+  };
+}
 
-let state = JSON.parse(localStorage.getItem(KEY)) || structuredClone(DEFAULT);
-let selected = null;
+var saved = localStorage.getItem(KEY);
+var state = saved ? JSON.parse(saved) : defaultState();
+var selected = null;
 
-/* ================= CORE ================= */
 function save() {
   localStorage.setItem(KEY, JSON.stringify(state));
 }
 
 function loop() {
-  const now = Date.now();
-  const sec = Math.min((now - state.last) / 1000, 86400);
+  var now = Date.now();
+  var sec = Math.min((now - state.last) / 1000, 86400);
   if (sec <= 0) return;
 
-  const era = ERAS[state.era];
+  var era = ERAS[state.era];
 
   state.prod += state.pop * 0.1 * era.prod * sec;
   if (state.stab > 40) state.pop += era.pop * sec;
@@ -187,11 +188,10 @@ function loop() {
   save();
 }
 
-/* ================= BUILD ================= */
 function selectBuild(type) {
   selected = type;
-  ["settlement","workshop","council"].forEach(t=>{
-    document.getElementById("b-"+t).classList.toggle("selected", t===type);
+  ["settlement","workshop","council"].forEach(function(t){
+    document.getElementById("b-"+t).classList.toggle("selected", t === type);
   });
 }
 
@@ -203,7 +203,6 @@ function place(i) {
   render();
 }
 
-/* ================= RENDER ================= */
 function render() {
   document.getElementById("eraValue").innerText = ERAS[state.era].name;
   document.getElementById("popValue").innerText = state.pop.toFixed(1);
@@ -212,22 +211,21 @@ function render() {
   document.getElementById("playValue").innerText = Math.floor(state.play/60) + " min";
   document.getElementById("tickValue").innerText = Math.floor(state.ticks);
 
-  const map = document.getElementById("map");
+  var map = document.getElementById("map");
   map.innerHTML = "";
-  state.map.forEach((c,i)=>{
-    const d = document.createElement("div");
+  state.map.forEach(function(c,i){
+    var d = document.createElement("div");
     d.className = "tile " + (c || "empty");
     d.innerText = c ? ({settlement:"🏠",workshop:"⚒",council:"🏛"}[c]) : "";
-    d.onclick = () => place(i);
+    d.onclick = function(){ place(i); };
     map.appendChild(d);
   });
 }
 
-/* ================= RESET ================= */
 function resetGame() {
   if (!confirm("Reset the realm?")) return;
   localStorage.removeItem(KEY);
-  state = structuredClone(DEFAULT);
+  state = defaultState();
   render();
 }
 
