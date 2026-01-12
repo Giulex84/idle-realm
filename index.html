@@ -1,80 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8" />
   <title>Pi SDK Baseline</title>
-
-  <!-- Pi SDK -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
-
 <body>
   <h1>Pi SDK Baseline</h1>
 
-  <button id="loginBtn">Login with Pi</button>
-  <button id="payBtn">Pay 1 Pi</button>
+  <button onclick="login()">Login with Pi</button>
+  <button onclick="pay()">Pay 1 Pi</button>
 
   <p id="status"></p>
 
   <script>
-    // INIT SDK
     Pi.init({ version: "2.0" });
 
-    const status = document.getElementById("status");
+    function login() {
+      Pi.authenticate(["username"], (auth) => {
+        document.getElementById("status").innerText =
+          "Logged as " + auth.user.username;
+      }, console.error);
+    }
 
-    // LOGIN
-    document.getElementById("loginBtn").onclick = async () => {
+    async function pay() {
       try {
-        const auth = await Pi.authenticate(["username"], () => {});
-        status.innerText = "Logged in as: " + auth.user.username;
+        const payment = await Pi.createPayment({
+          amount: 1,
+          memo: "Test payment"
+        });
+
+        await fetch("/api/pi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "approve",
+            paymentId: payment.identifier
+          })
+        });
+
+        document.getElementById("status").innerText = "Payment completed";
       } catch (e) {
-        status.innerText = "Login error";
+        document.getElementById("status").innerText = "Payment failed";
         console.error(e);
       }
-    };
-
-    // PAYMENT
-    document.getElementById("payBtn").onclick = () => {
-      status.innerText = "Starting payment...";
-
-      Pi.createPayment({
-        amount: 1,
-        memo: "Test payment",
-        metadata: { app: "idle-realm" },
-
-        onReadyForServerApproval(paymentId) {
-          fetch("/api/pi", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "approve",
-              paymentId
-            })
-          });
-        },
-
-        onReadyForServerCompletion(paymentId, txid) {
-          fetch("/api/pi", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "complete",
-              paymentId,
-              txid
-            })
-          });
-        },
-
-        onCancel() {
-          status.innerText = "Payment cancelled";
-        },
-
-        onError(err) {
-          status.innerText = "Payment error";
-          console.error(err);
-        }
-      });
-    };
+    }
   </script>
 </body>
 </html>
