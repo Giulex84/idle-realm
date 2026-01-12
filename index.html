@@ -1,33 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Pi SDK Baseline</title>
+
+  <!-- PI SDK -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+    }
+    button {
+      margin-right: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
 </head>
+
 <body>
+  <h1>Pi SDK Baseline</h1>
 
-<h1>Pi SDK Baseline</h1>
-<button onclick="login()">Login with Pi</button>
-<button onclick="pay()">Pay 1 Pi</button>
+  <button onclick="login()">Login with Pi</button>
+  <button onclick="pay()">Pay 1 Pi</button>
 
-<script>
-Pi.init({ version: "2.0" });
+  <p id="status"></p>
 
-function login() {
-  Pi.authenticate(["username"], (auth) => {
-    document.body.innerHTML += `<p>Welcome ${auth.user.username}</p>`;
-  });
-}
+  <script>
+    // ⚠️ OBBLIGATORIO
+    Pi.init({ version: "2.0" });
 
-function pay() {
-  Pi.createPayment({
-    amount: 1,
-    memo: "Test payment",
-    metadata: { test: true }
-  }, {
-    onReadyForServerApproval: async (paymentId) => {
-      await fetch("/api/pi", {
+    let currentUser = null;
+
+    async function login() {
+      try {
+        const auth = await Pi.authenticate(["username"], onIncompletePaymentFound);
+        currentUser = auth.user.username;
+        document.getElementById("status").innerText =
+          "Welcome: " + currentUser;
+      } catch (err) {
+        document.getElementById("status").innerText =
+          "Login failed";
+        console.error(err);
+      }
+    }
+
+    async function pay() {
+      if (!currentUser) {
+        alert("Login first");
+        return;
+      }
+
+      try {
+        await Pi.createPayment({
+          amount: 1,
+          memo: "Test payment",
+          metadata: { app: "idle-realm" }
+        }, {
+          onReadyForServerApproval,
+          onReadyForServerCompletion,
+          onCancel,
+          onError
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function onReadyForServerApproval(paymentId) {
+      fetch("/api/pi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -35,13 +78,31 @@ function pay() {
           paymentId
         })
       });
-    },
-    onCompleted: () => alert("Payment completed"),
-    onCancelled: () => alert("Payment cancelled"),
-    onError: e => alert(e)
-  });
-}
-</script>
+    }
 
+    function onReadyForServerCompletion(paymentId, txid) {
+      fetch("/api/pi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "complete",
+          paymentId,
+          txid
+        })
+      });
+    }
+
+    function onIncompletePaymentFound(payment) {
+      console.log("Incomplete payment", payment);
+    }
+
+    function onCancel() {
+      alert("Payment cancelled");
+    }
+
+    function onError(err) {
+      console.error(err);
+    }
+  </script>
 </body>
 </html>
