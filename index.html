@@ -1,34 +1,38 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Pi SDK Test</title>
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-</head>
-<body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pi SDK Baseline</title>
 
-<h1>Pi SDK Baseline</h1>
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <script>
+      Pi.init({ version: "2.0" });
+    </script>
+  </head>
 
-<button onclick="login()">Login with Pi</button>
+  <body>
+    <button id="login">Login with Pi</button>
 
-<p id="out"></p>
+    <script>
+      const scopes = ["username"];
 
-<script>
-  function login() {
-    if (!window.Pi) {
-      document.getElementById("out").innerText = "Pi SDK NOT LOADED";
-      return;
-    }
+      document.getElementById("login").onclick = async () => {
+        try {
+          const auth = await Pi.authenticate(scopes, (payment) => {
+            console.log("Incomplete payment", payment);
+          });
 
-    Pi.authenticate(["username"], function(auth) {
-      document.getElementById("out").innerText =
-        "Logged in as " + auth.user.username;
-    }, function(err) {
-      document.getElementById("out").innerText = "Auth error";
-      console.error(err);
-    });
-  }
-</script>
+          console.log("AUTH SUCCESS", auth);
 
-</body>
+          document.body.innerHTML = `
+            <h2>Welcome ${auth.user.username}</h2>
+            <p>User authenticated correctly.</p>
+          `;
+        } catch (err) {
+          console.error("AUTH ERROR", err);
+          alert("Authentication failed");
+        }
+      };
+    </script>
+  </body>
 </html>
