@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Idle Realm</title>
+    <title>Pi SDK Auth + Payments Baseline</title>
 
     <!-- Pi SDK -->
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
@@ -13,40 +13,87 @@
     <style>
       body {
         font-family: Arial, sans-serif;
-        background: #f7f7f7;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
+        padding: 40px;
       }
       button {
         padding: 12px 20px;
+        margin: 10px 0;
         font-size: 16px;
       }
     </style>
   </head>
 
   <body>
+    <h1>Pi SDK Baseline</h1>
+
     <button id="login">Login with Pi</button>
+    <button id="pay" disabled>Pay 1 Pi</button>
+
+    <div id="output"></div>
 
     <script>
-      const scopes = ["username"];
+      let currentUser = null;
 
+      const scopes = ["username", "payments"];
+
+      // LOGIN
       document.getElementById("login").onclick = async () => {
         try {
-          const auth = await Pi.authenticate(scopes, (payment) => {
-            console.log("Incomplete payment", payment);
-          });
+          const auth = await Pi.authenticate(scopes, () => {});
+          currentUser = auth.user;
 
-          console.log("AUTH SUCCESS", auth);
+          document.getElementById("pay").disabled = false;
 
-          document.body.innerHTML = `
-            <h2>Welcome ${auth.user.username}</h2>
+          document.getElementById("output").innerHTML = `
+            <p><strong>Welcome:</strong> ${currentUser.username}</p>
             <p>User authenticated correctly.</p>
           `;
         } catch (err) {
-          console.error("AUTH ERROR", err);
+          console.error(err);
           alert("Authentication failed");
+        }
+      };
+
+      // PAYMENT
+      document.getElementById("pay").onclick = async () => {
+        const paymentData = {
+          amount: 1,
+          memo: "Idle Realm – Testnet Purchase",
+          metadata: {
+            app: "idle-realm",
+            item: "starter_pack"
+          }
+        };
+
+        try {
+          await Pi.createPayment(paymentData, {
+            onReadyForServerApproval: (paymentId) => {
+              console.log("Ready for server approval:", paymentId);
+              // futuro: chiamata backend
+            },
+
+            onReadyForServerCompletion: (paymentId, txid) => {
+              console.log("Ready for server completion:", paymentId, txid);
+              // futuro: conferma backend
+            },
+
+            onComplete: (payment) => {
+              console.log("Payment completed:", payment);
+              alert("✅ Payment successful!");
+            },
+
+            onCancel: (payment) => {
+              console.log("Payment cancelled:", payment);
+              alert("❌ Payment cancelled");
+            },
+
+            onError: (error, payment) => {
+              console.error("Payment error:", error, payment);
+              alert("⚠️ Payment error");
+            }
+          });
+        } catch (err) {
+          console.error(err);
         }
       };
     </script>
