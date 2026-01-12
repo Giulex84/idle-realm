@@ -4,32 +4,44 @@
   <meta charset="UTF-8" />
   <title>Pi SDK Baseline</title>
 
-  <!-- Pi SDK -->
+  <!-- Pi SDK (OBBLIGATORIO) -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 
   <script>
-    let currentUser = null;
+    let user = null;
 
+    // INIT SDK (OBBLIGATORIO)
     document.addEventListener("DOMContentLoaded", () => {
-      Pi.init({ version: "2.0" });
+      if (!window.Pi) {
+        alert("Pi SDK not loaded. Use Pi Browser.");
+        return;
+      }
+
+      Pi.init({
+        version: "2.0",
+        sandbox: false
+      });
     });
 
-    function login() {
+    // LOGIN
+    function loginWithPi() {
       Pi.authenticate(
         ["username"],
-        (auth) => {
-          currentUser = auth.user;
-          document.getElementById("user").innerText =
-            "Welcome: " + currentUser.username;
+        function (auth) {
+          user = auth.user;
+          document.getElementById("status").innerText =
+            "Welcome: " + user.username;
         },
-        (err) => {
-          console.error("Login error", err);
+        function (error) {
+          console.error("Auth error:", error);
+          alert("Authentication failed");
         }
       );
     }
 
-    function pay() {
-      if (!currentUser) {
+    // PAYMENT
+    function payOnePi() {
+      if (!user) {
         alert("Login first");
         return;
       }
@@ -38,10 +50,10 @@
         {
           amount: 1,
           memo: "Test payment",
-          metadata: { purpose: "test" }
+          metadata: { app: "idle-realm" }
         },
         {
-          onReadyForServerApproval: function (paymentId) {
+          onReadyForServerApproval(paymentId) {
             fetch("/api/pi", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -52,7 +64,7 @@
             });
           },
 
-          onReadyForServerCompletion: function (paymentId, txid) {
+          onReadyForServerCompletion(paymentId, txid) {
             fetch("/api/pi", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -64,12 +76,13 @@
             });
           },
 
-          onCancel: function (paymentId) {
-            console.log("Payment cancelled", paymentId);
+          onCancel(paymentId) {
+            console.log("Payment cancelled:", paymentId);
           },
 
-          onError: function (error, payment) {
-            console.error("Payment error", error, payment);
+          onError(error, payment) {
+            console.error("Payment error:", error, payment);
+            alert("Payment error");
           }
         }
       );
@@ -80,9 +93,9 @@
 <body>
   <h1>Pi SDK Baseline</h1>
 
-  <button onclick="login()">Login with Pi</button>
-  <button onclick="pay()">Pay 1 Pi</button>
+  <button onclick="loginWithPi()">Login with Pi</button>
+  <button onclick="payOnePi()">Pay 1 Pi</button>
 
-  <p id="user"></p>
+  <p id="status"></p>
 </body>
 </html>
