@@ -41,7 +41,7 @@
     }
 
     .panel {
-      background: rgba(17, 24, 39, 0.85);
+      background: rgba(17, 24, 39, 0.9);
       border: 1px solid #1f2937;
       border-radius: 14px;
       padding: 16px;
@@ -58,9 +58,6 @@
       margin-bottom: 6px;
     }
 
-    .good { color: #4ade80; }
-    .bad { color: #f87171; }
-
     button {
       background: #2563eb;
       border: none;
@@ -73,13 +70,12 @@
 
     button:disabled {
       background: #374151;
-      cursor: not-allowed;
     }
 
-    /* ===== CITY GRID ===== */
-    .city {
+    /* ===== MAP ===== */
+    .map {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(7, 1fr);
       gap: 6px;
       margin-top: 12px;
     }
@@ -87,17 +83,19 @@
     .tile {
       height: 56px;
       border-radius: 10px;
-      background: #020617;
       border: 1px solid #1f2937;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 22px;
+      cursor: pointer;
+      background: #020617;
     }
 
-    .settlement { background: #1e293b; }
-    .workshop { background: #1f2937; }
-    .council { background: #312e81; }
+    .tile.empty { background: #020617; }
+    .tile.settlement { background: #1e293b; }
+    .tile.workshop { background: #1f2937; }
+    .tile.council { background: #312e81; }
 
     /* ===== EVENTS ===== */
     .event {
@@ -114,6 +112,11 @@
       font-size: 13px;
     }
 
+    .era {
+      font-size: 14px;
+      color: #a5b4fc;
+    }
+
     .meta {
       font-size: 14px;
       color: #9ca3af;
@@ -124,38 +127,38 @@
 <body>
 <header>
   <h1>Idle Realm</h1>
-  <p>A living world that grows with time</p>
+  <p>A living world shaped by time and eras</p>
 </header>
 
 <main>
-  <!-- ===== REALM ===== -->
+  <!-- REALM -->
   <div class="panel">
     <h2>Realm</h2>
-    <div class="stat"><span>Era</span><span id="era"></span></div>
+    <div class="stat"><span>Era</span><span class="era" id="era"></span></div>
     <div class="stat"><span>Population</span><span id="population"></span></div>
     <div class="stat"><span>Production</span><span id="production"></span></div>
     <div class="stat"><span>Stability</span><span id="stability"></span></div>
 
     <h3>Build</h3>
-    <button onclick="build('settlement')">🏠 Settlement</button>
-    <button onclick="build('workshop')">⚒ Workshop</button>
-    <button onclick="build('council')">🏛 Council</button>
+    <button onclick="selectBuild('settlement')">🏠 Settlement</button>
+    <button onclick="selectBuild('workshop')">⚒ Workshop</button>
+    <button onclick="selectBuild('council')">🏛 Council</button>
   </div>
 
-  <!-- ===== CITY ===== -->
+  <!-- MAP -->
   <div class="panel">
-    <h2>City</h2>
-    <p class="meta">Each tile represents a real structure in your realm.</p>
-    <div class="city" id="city"></div>
+    <h2>World Map</h2>
+    <p class="meta">Click an empty tile to place the selected structure.</p>
+    <div class="map" id="map"></div>
   </div>
 
-  <!-- ===== EVENTS ===== -->
+  <!-- EVENTS -->
   <div class="panel">
     <h2>Events</h2>
     <div id="events"></div>
   </div>
 
-  <!-- ===== META ===== -->
+  <!-- META -->
   <div class="panel">
     <h2>Meta</h2>
     <div class="stat"><span>Play time</span><span id="playtime"></span></div>
@@ -166,9 +169,39 @@
 
 <script>
 /* ============================================================
-   STATE
+   STATE & ERAS
 ============================================================ */
 const STORAGE_KEY = "idle_realm_save";
+
+const ERAS = [
+  {
+    name: "Foundations",
+    rules: {
+      popGrowth: 0.01,
+      prodBonus: 1.0,
+      stabilityDecay: 0.004
+    },
+    unlockAtPop: 0
+  },
+  {
+    name: "Expansion",
+    rules: {
+      popGrowth: 0.015,
+      prodBonus: 1.2,
+      stabilityDecay: 0.006
+    },
+    unlockAtPop: 30
+  },
+  {
+    name: "Crisis",
+    rules: {
+      popGrowth: 0.005,
+      prodBonus: 0.9,
+      stabilityDecay: 0.01
+    },
+    unlockAtPop: 80
+  }
+];
 
 const DEFAULT_STATE = {
   meta: {
@@ -176,9 +209,7 @@ const DEFAULT_STATE = {
     createdAt: Date.now(),
     lastTick: Date.now()
   },
-  realm: {
-    era: "Foundations"
-  },
+  eraIndex: 0,
   resources: {
     population: 10,
     production: 20,
@@ -189,7 +220,7 @@ const DEFAULT_STATE = {
     workshop: 0,
     council: 0
   },
-  city: [],
+  map: Array(49).fill(null),
   events: [],
   stats: {
     playTime: 0,
@@ -197,11 +228,13 @@ const DEFAULT_STATE = {
   }
 };
 
-const BUILD_COST = {
-  settlement: { production: 25, stability: 2, icon: "🏠" },
-  workshop: { production: 40, stability: 4, icon: "⚒" },
-  council: { production: 60, stability: 0, icon: "🏛" }
+const BUILD_DATA = {
+  settlement: { cost: 25, stability: 2, icon: "🏠" },
+  workshop: { cost: 40, stability: 4, icon: "⚒" },
+  council: { cost: 60, stability: 0, icon: "🏛" }
 };
+
+let selectedBuild = null;
 
 /* ============================================================
    LOAD / SAVE
@@ -218,8 +251,17 @@ function saveState() {
 }
 
 /* ============================================================
-   GAME LOOP
+   GAME LOGIC
 ============================================================ */
+function updateEra() {
+  for (let i = ERAS.length - 1; i >= 0; i--) {
+    if (state.resources.population >= ERAS[i].unlockAtPop) {
+      state.eraIndex = i;
+      break;
+    }
+  }
+}
+
 function applyTime() {
   const now = Date.now();
   const elapsed = Math.min(
@@ -228,21 +270,24 @@ function applyTime() {
   );
   if (elapsed <= 0) return;
 
+  const era = ERAS[state.eraIndex].rules;
+
   const prodRate =
-    state.resources.population * 0.1 +
+    state.resources.population * 0.1 *
+    era.prodBonus +
     state.buildings.workshop * 0.6;
 
   state.resources.production += prodRate * elapsed;
 
-  if (state.resources.stability > 50) {
-    state.resources.population += elapsed * 0.01;
+  if (state.resources.stability > 40) {
+    state.resources.population += elapsed * era.popGrowth;
   }
 
   state.resources.stability +=
     state.buildings.council * 0.002 * elapsed;
 
   state.resources.stability -=
-    elapsed * (0.004 + state.buildings.workshop * 0.001);
+    elapsed * era.stabilityDecay;
 
   state.resources.stability = Math.max(
     0, Math.min(100, state.resources.stability)
@@ -252,71 +297,71 @@ function applyTime() {
     createEvent();
   }
 
+  updateEra();
+
   state.meta.lastTick = now;
   state.stats.playTime += elapsed;
   state.stats.ticks += elapsed;
 }
 
 /* ============================================================
-   EVENTS WITH CHOICES
+   EVENTS
 ============================================================ */
 function createEvent() {
-  const bad = state.resources.stability < 40;
+  const unstable = state.resources.stability < 40;
 
-  const event = bad
+  const event = unstable
     ? {
-        text: "Unrest spreads among the population.",
+        text: "Riots erupt in the outer districts.",
         choices: [
-          {
-            label: "Suppress dissent",
-            effect() { state.resources.stability += 5; }
-          },
-          {
-            label: "Ignore it",
-            effect() { state.resources.stability -= 5; }
-          }
+          { label: "Send guards", effect() { state.resources.stability += 5; } },
+          { label: "Let it burn", effect() { state.resources.population -= 1; } }
         ]
       }
     : {
-        text: "A calm period strengthens social cohesion.",
+        text: "Trade caravans bring prosperity.",
         choices: [
-          {
-            label: "Encourage growth",
-            effect() { state.resources.population += 1; }
-          },
-          {
-            label: "Stockpile resources",
-            effect() { state.resources.production += 10; }
-          }
+          { label: "Tax trade", effect() { state.resources.production += 15; } },
+          { label: "Encourage migration", effect() { state.resources.population += 2; } }
         ]
       };
 
   state.events.unshift(event);
-  state.events = state.events.slice(0, 5);
+  state.events = state.events.slice(0, 4);
 }
 
 /* ============================================================
-   BUILDINGS
+   BUILDING & MAP
 ============================================================ */
-function build(type) {
-  const cost = BUILD_COST[type];
+function selectBuild(type) {
+  selectedBuild = type;
+}
+
+function placeBuilding(index) {
+  if (!selectedBuild) return;
+  if (state.map[index]) return;
+
+  const b = BUILD_DATA[selectedBuild];
   if (
-    state.resources.production < cost.production ||
-    state.resources.stability < cost.stability
+    state.resources.production < b.cost ||
+    state.resources.stability < b.stability
   ) return;
 
-  state.resources.production -= cost.production;
-  state.resources.stability -= cost.stability;
-  state.buildings[type]++;
-  state.city.push(type);
-  createEvent();
+  state.resources.production -= b.cost;
+  state.resources.stability -= b.stability;
+
+  state.map[index] = selectedBuild;
+  state.buildings[selectedBuild]++;
+  selectedBuild = null;
 }
 
 /* ============================================================
    RENDER
 ============================================================ */
 function render() {
-  document.getElementById("era").innerText = state.realm.era;
+  document.getElementById("era").innerText =
+    ERAS[state.eraIndex].name;
+
   document.getElementById("population").innerText =
     state.resources.population.toFixed(1);
   document.getElementById("production").innerText =
@@ -326,15 +371,17 @@ function render() {
 
   document.getElementById("playtime").innerText =
     Math.floor(state.stats.playTime / 60) + " min";
-  document.getElementById("ticks").innerText = state.stats.ticks;
+  document.getElementById("ticks").innerText =
+    state.stats.ticks;
 
-  const city = document.getElementById("city");
-  city.innerHTML = "";
-  state.city.forEach(type => {
-    const tile = document.createElement("div");
-    tile.className = "tile " + type;
-    tile.innerText = BUILD_COST[type].icon;
-    city.appendChild(tile);
+  const mapEl = document.getElementById("map");
+  mapEl.innerHTML = "";
+  state.map.forEach((cell, i) => {
+    const d = document.createElement("div");
+    d.className = "tile " + (cell || "empty");
+    d.innerText = cell ? BUILD_DATA[cell].icon : "";
+    d.onclick = () => placeBuilding(i);
+    mapEl.appendChild(d);
   });
 
   const ev = document.getElementById("events");
