@@ -1,71 +1,80 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Pi SDK Baseline</title>
+
+  <!-- Pi SDK -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
+
 <body>
+  <h1>Pi SDK Baseline</h1>
 
-<h1>Pi SDK Baseline</h1>
+  <button id="loginBtn">Login with Pi</button>
+  <button id="payBtn">Pay 1 Pi</button>
 
-<button id="loginBtn">Login with Pi</button>
-<button id="payBtn" disabled>Pay 1 Pi</button>
+  <p id="status"></p>
 
-<p id="status"></p>
+  <script>
+    // INIT SDK
+    Pi.init({ version: "2.0" });
 
-<script>
-  Pi.init({ version: "2.0" });
+    const status = document.getElementById("status");
 
-  let currentUser = null;
-
-  document.getElementById("loginBtn").onclick = async () => {
-    try {
-      const auth = await Pi.authenticate(["username"], () => {});
-      currentUser = auth.user;
-      document.getElementById("status").innerText =
-        "Welcome: " + currentUser.username;
-      document.getElementById("payBtn").disabled = false;
-    } catch {
-      document.getElementById("status").innerText = "Login failed";
-    }
-  };
-
-  document.getElementById("payBtn").onclick = () => {
-    Pi.createPayment({
-      amount: 1,
-      memo: "Idle Realm Test Payment",
-      metadata: { app: "idle-realm" },
-
-      onReadyForServerApproval: async (paymentId) => {
-        await fetch("/api/pi", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "approve",
-            paymentId
-          })
-        });
-      },
-
-      onReadyForServerCompletion: async (paymentId, txid) => {
-        document.getElementById("status").innerText =
-          "Payment completed ✔️";
-      },
-
-      onCancel: () => {
-        document.getElementById("status").innerText =
-          "Payment cancelled";
-      },
-
-      onError: (err) => {
-        document.getElementById("status").innerText =
-          "Payment error";
-        console.error(err);
+    // LOGIN
+    document.getElementById("loginBtn").onclick = async () => {
+      try {
+        const auth = await Pi.authenticate(["username"], () => {});
+        status.innerText = "Logged in as: " + auth.user.username;
+      } catch (e) {
+        status.innerText = "Login error";
+        console.error(e);
       }
-    });
-  };
-</script>
+    };
 
+    // PAYMENT
+    document.getElementById("payBtn").onclick = () => {
+      status.innerText = "Starting payment...";
+
+      Pi.createPayment({
+        amount: 1,
+        memo: "Test payment",
+        metadata: { app: "idle-realm" },
+
+        onReadyForServerApproval(paymentId) {
+          fetch("/api/pi", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "approve",
+              paymentId
+            })
+          });
+        },
+
+        onReadyForServerCompletion(paymentId, txid) {
+          fetch("/api/pi", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "complete",
+              paymentId,
+              txid
+            })
+          });
+        },
+
+        onCancel() {
+          status.innerText = "Payment cancelled";
+        },
+
+        onError(err) {
+          status.innerText = "Payment error";
+          console.error(err);
+        }
+      });
+    };
+  </script>
 </body>
 </html>
