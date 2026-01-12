@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Idle Realm</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<title>Idle Realm – Recovery</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 <script>
@@ -13,103 +13,40 @@
 <style>
 body{
   margin:0;
-  font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
-  background:radial-gradient(circle at top,#0b132b,#020617);
+  font-family:system-ui,-apple-system,sans-serif;
+  background:#020617;
   color:#e5e7eb;
 }
-
-/* HUD */
 #hud{
   position:sticky;
   top:0;
-  z-index:10;
-  background:#020617ee;
+  background:#020617;
+  padding:10px;
   display:flex;
   justify-content:space-around;
-  padding:10px;
-  border-bottom:1px solid rgba(255,255,255,0.08);
-  font-size:14px;
+  border-bottom:1px solid #1f2937;
 }
-
 main{
-  max-width:900px;
-  margin:auto;
-  padding:20px;
-  display:grid;
-  gap:20px;
+  padding:16px;
 }
-
-.card{
-  background:linear-gradient(180deg,#020617,#020617cc);
-  border-radius:18px;
-  padding:18px;
-  border:1px solid rgba(255,255,255,0.06);
-}
-
 button{
-  background:#2563eb;
-  color:white;
-  border:none;
-  padding:12px 16px;
-  border-radius:12px;
-  font-weight:600;
-  cursor:pointer;
-  transition:transform .1s, box-shadow .1s;
-}
-button:hover{
-  transform:translateY(-1px);
-  box-shadow:0 4px 12px rgba(37,99,235,.4);
-}
-button:disabled{
-  background:#374151;
-  box-shadow:none;
-}
-
-.build-row{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
-
-/* CITY VISUAL */
-.city{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:16px;
-  text-align:center;
-}
-
-.district{
-  background:#020617;
-  border-radius:14px;
   padding:12px;
-  border:1px solid rgba(255,255,255,0.08);
+  margin:6px 6px 0 0;
+  background:#2563eb;
+  border:none;
+  color:white;
+  border-radius:8px;
+  font-weight:600;
 }
-
-.stage{
-  margin-top:8px;
+button:active{
+  background:#1d4ed8;
+}
+.log{
+  margin-top:12px;
   font-size:14px;
-  color:#9ca3af;
 }
-
-svg{
-  width:48px;
-  height:48px;
-  margin:auto;
-  display:block;
-}
-
-.flash{
-  animation:flash .3s;
-}
-@keyframes flash{
-  from{box-shadow:0 0 0 rgba(34,197,94,0)}
-  to{box-shadow:0 0 16px rgba(34,197,94,.8)}
-}
-
-.event{
-  font-size:14px;
-  margin-bottom:6px;
+.log div{
+  margin-bottom:4px;
 }
 </style>
 </head>
@@ -117,151 +54,100 @@ svg{
 <body>
 
 <div id="hud">
-  👥 <span id="hud-pop"></span>
-  ⚒ <span id="hud-prod"></span>
-  🛡 <span id="hud-stab"></span>%
-  🕰 <span id="hud-era"></span>
+  👥 <span id="pop">0</span>
+  ⚒ <span id="prod">0</span>
+  🛡 <span id="stab">0</span>%
+  ⏱ <span id="ticks">0</span>
 </div>
 
 <main>
+  <h1>Idle Realm (Recovery)</h1>
 
-<header>
-  <h1>Idle Realm</h1>
-  <div style="color:#9ca3af">A symbolic strategy world</div>
-</header>
+  <button onclick="buildSettlement()">🏠 Build Settlement</button>
+  <button onclick="buildWorkshop()">⚒ Build Workshop</button>
+  <button onclick="buildCouncil()">🏛 Build Council</button>
 
-<div class="card">
-  <h2>Realm</h2>
-  Era: <strong id="era"></strong><br>
-  Population: <strong id="pop"></strong><br>
-  Production: <strong id="prod"></strong><br>
-  Stability: <strong id="stab"></strong>%
-  <h3>Build</h3>
-  <div class="build-row">
-    <button onclick="build('settlement')">🏠 Settlement</button>
-    <button onclick="build('workshop')">⚒ Workshop</button>
-    <button onclick="build('council')">🏛 Council</button>
-  </div>
-</div>
-
-<div class="card">
-  <h2>City</h2>
-  <div class="city">
-    <div class="district" id="res-box">
-      <!-- Residential SVG -->
-      <svg viewBox="0 0 64 64" fill="#60a5fa">
-        <rect x="8" y="28" width="48" height="28" rx="4"/>
-        <polygon points="8,28 32,8 56,28"/>
-      </svg>
-      <div><strong>Residential</strong></div>
-      <div class="stage" id="res-stage"></div>
-    </div>
-
-    <div class="district" id="ind-box">
-      <!-- Industrial SVG -->
-      <svg viewBox="0 0 64 64" fill="#fbbf24">
-        <rect x="8" y="20" width="48" height="36" rx="4"/>
-        <rect x="16" y="10" width="8" height="10"/>
-        <rect x="32" y="10" width="8" height="10"/>
-      </svg>
-      <div><strong>Industrial</strong></div>
-      <div class="stage" id="ind-stage"></div>
-    </div>
-
-    <div class="district" id="gov-box">
-      <!-- Government SVG -->
-      <svg viewBox="0 0 64 64" fill="#a78bfa">
-        <polygon points="32,8 8,24 56,24"/>
-        <rect x="12" y="24" width="40" height="28"/>
-      </svg>
-      <div><strong>Government</strong></div>
-      <div class="stage" id="gov-stage"></div>
-    </div>
-  </div>
-</div>
-
-<div class="card">
-  <h2>Events</h2>
-  <div id="events"></div>
-</div>
-
+  <div class="log" id="log"></div>
 </main>
 
 <script>
-const SAVE="idle_realm_svg_v1";
+const KEY = "idle_realm_recovery";
 
-let state={
-  era:"Foundations",
-  population:10,
-  production:10,
-  stability:80,
-  buildings:{settlement:1,workshop:0,council:0},
-  events:[]
+let state = {
+  pop: 10,
+  prod: 5,
+  stab: 80,
+  settlements: 1,
+  workshops: 0,
+  councils: 0,
+  ticks: 0,
+  log: []
 };
 
-const STAGES=[
-  ["Outpost","Village","Town","City","Metropolis"],
-  ["Sheds","Workshops","Factories","Industrial Hub"],
-  ["Clan Hall","Council","Palace"]
-];
-
-function stage(count,type){
-  return STAGES[type][Math.min(count-1,STAGES[type].length-1)];
-}
-
 function load(){
-  const s=localStorage.getItem(SAVE);
-  if(s)state=JSON.parse(s);
+  const s = localStorage.getItem(KEY);
+  if(s) state = JSON.parse(s);
 }
+
 function save(){
-  localStorage.setItem(SAVE,JSON.stringify(state));
+  localStorage.setItem(KEY, JSON.stringify(state));
 }
 
-function flash(id){
-  const el=document.getElementById(id);
-  el.classList.add("flash");
-  setTimeout(()=>el.classList.remove("flash"),300);
+function log(msg){
+  state.log.unshift(msg);
+  if(state.log.length > 6) state.log.pop();
 }
 
-function log(t){
-  state.events.unshift(t);
-  if(state.events.length>5)state.events.pop();
+function buildSettlement(){
+  state.pop += 2;
+  state.settlements++;
+  state.stab -= 2;
+  log("Built Settlement (+2 pop, -2 stab)");
+  render(); save();
 }
 
-function build(type){
-  if(type==="settlement"){state.population+=2;state.buildings.settlement++;flash("res-box");}
-  if(type==="workshop"){state.production+=3;state.buildings.workshop++;flash("ind-box");}
-  if(type==="council"){state.stability+=5;state.buildings.council++;flash("gov-box");}
-  log("Built "+type);
-  render();save();
+function buildWorkshop(){
+  state.prod += 3;
+  state.workshops++;
+  state.stab -= 1;
+  log("Built Workshop (+3 prod, -1 stab)");
+  render(); save();
+}
+
+function buildCouncil(){
+  state.stab += 5;
+  state.councils++;
+  log("Built Council (+5 stab)");
+  render(); save();
+}
+
+function tick(){
+  state.pop += state.settlements * 0.02;
+  state.prod += state.workshops * 0.04;
+  state.stab -= state.settlements * 0.01;
+  state.stab = Math.max(0, Math.min(100, state.stab));
+  state.ticks++;
+  render(); save();
 }
 
 function render(){
-  hud-pop.textContent=state.population.toFixed(1);
-  hud-prod.textContent=state.production.toFixed(1);
-  hud-stab.textContent=Math.round(state.stability);
-  hud-era.textContent=state.era;
+  pop.textContent = state.pop.toFixed(1);
+  prod.textContent = state.prod.toFixed(1);
+  stab.textContent = Math.round(state.stab);
+  ticks.textContent = state.ticks;
 
-  era.textContent=state.era;
-  pop.textContent=state.population.toFixed(1);
-  prod.textContent=state.production.toFixed(1);
-  stab.textContent=Math.round(state.stability);
-
-  res-stage.textContent=stage(state.buildings.settlement,0);
-  ind-stage.textContent=stage(state.buildings.workshop,1);
-  gov-stage.textContent=stage(state.buildings.council,2);
-
-  events.innerHTML="";
-  state.events.forEach(e=>{
-    const d=document.createElement("div");
-    d.className="event";
-    d.textContent="• "+e;
-    events.appendChild(d);
+  const l = document.getElementById("log");
+  l.innerHTML = "";
+  state.log.forEach(e=>{
+    const d = document.createElement("div");
+    d.textContent = "• " + e;
+    l.appendChild(d);
   });
 }
 
 load();
 render();
+setInterval(tick, 1000);
 </script>
 
 </body>
