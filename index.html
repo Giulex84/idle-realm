@@ -1,305 +1,259 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Idle Realm</title>
 
 <style>
+:root{
+  --bg:#0b1220;
+  --card:#141c33;
+  --card2:#1b2546;
+  --accent:#2f6bff;
+  --text:#e6ecff;
+  --muted:#9aa4c7;
+  --danger:#ff6b6b;
+}
+
+*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
+
 body{
   margin:0;
-  font-family:system-ui,-apple-system;
-  background:radial-gradient(circle at top,#1b2a4a,#050914);
-  color:#e5e7eb;
+  background:linear-gradient(180deg,#0a1020,#050a14);
+  color:var(--text);
 }
+
 header{
-  padding:10px;
+  position:sticky;
+  top:0;
+  z-index:10;
+  background:#060b18;
+  padding:8px 12px;
   display:flex;
-  justify-content:space-around;
-  background:#050914;
+  justify-content:space-between;
   font-size:14px;
 }
-.container{padding:16px;max-width:420px;margin:auto}
-h1{margin:8px 0 0;font-size:30px}
-.subtitle{opacity:.7;margin-bottom:16px}
+
+header span{display:flex;align-items:center;gap:6px}
+
+main{padding:16px;max-width:500px;margin:auto}
+
+h1{margin:10px 0 4px}
+.subtitle{color:var(--muted);font-size:14px;margin-bottom:16px}
+
 .card{
-  background:rgba(255,255,255,.06);
+  background:linear-gradient(180deg,var(--card),var(--card2));
   border-radius:16px;
   padding:16px;
-  margin-bottom:18px;
+  margin-bottom:16px;
 }
+
+.card h2{margin:0 0 12px}
+
 button{
   width:100%;
-  padding:14px;
-  margin-top:10px;
   border:none;
   border-radius:14px;
-  font-size:16px;
-  background:#2563eb;
+  padding:14px;
+  margin-bottom:10px;
+  background:var(--accent);
   color:white;
+  font-size:16px;
 }
-button:disabled{opacity:.4}
+
+button:disabled{
+  opacity:.4;
+}
+
+.small{font-size:13px;color:var(--muted)}
+
 .grid{
   display:grid;
   grid-template-columns:repeat(3,1fr);
-  gap:12px;
+  gap:10px;
 }
+
 .tile{
+  background:#0f1730;
+  border-radius:12px;
   height:70px;
-  border-radius:14px;
-  background:rgba(255,255,255,.08);
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:30px;
+  font-size:28px;
 }
-.log{font-size:14px;opacity:.85}
-.cooldown{color:#facc15;font-weight:600}
-.objective{font-size:14px}
-.objective.done{color:#22c55e}
-.locked{opacity:.5}
+
+footer{
+  font-size:13px;
+  color:var(--muted);
+}
 </style>
 </head>
 
 <body>
 
 <header>
-  👥 <span id="pop"></span>
-  ⚒️ <span id="prod"></span>
-  🛡️ <span id="stab"></span>%
-  ⏳ <span id="time"></span>
+  <span>👥 <b id="pop"></b></span>
+  <span>⚒️ <b id="prod"></b></span>
+  <span>🛡️ <b id="stab"></b>%</span>
+  <span>⏳ <b id="time"></b></span>
 </header>
 
-<div class="container">
-<h1>Idle Realm</h1>
-<div class="subtitle">A living world shaped by time and choices</div>
+<main>
+  <h1>Idle Realm</h1>
+  <div class="subtitle">A living world shaped by time and choices</div>
 
-<div class="card">
-<h2>Build</h2>
-<button id="bSettlement">🏠 Settlement</button>
-<button id="bWorkshop">🛠 Workshop</button>
-<button id="bCouncil">🏛 Council</button>
-<div id="cooldown" class="cooldown"></div>
-</div>
+  <div class="card">
+    <h2>Build</h2>
+    <button id="btnSettle">🏠 Settlement</button>
+    <button id="btnWork">⚒️ Workshop</button>
+    <button id="btnCouncil">🏛️ Council</button>
+    <div class="small" id="costs"></div>
+    <div class="small" id="cooldown"></div>
+  </div>
 
-<div class="card">
-<h2>City</h2>
-<div id="city" class="grid"></div>
-</div>
+  <div class="card">
+    <h2>City</h2>
+    <div class="grid" id="city"></div>
+  </div>
 
-<div class="card">
-<h2>Era</h2>
-<div id="eraText"></div>
-<div id="objectives"></div>
-</div>
+  <div class="card">
+    <h2>Era</h2>
+    <div id="eraText"></div>
+  </div>
 
-<div class="card">
-<h2>Events</h2>
-<div id="events" class="log"></div>
-</div>
+  <div class="card">
+    <h2>Events</h2>
+    <div id="events"></div>
+    <div class="small" style="margin-top:8px">
+      Production grows automatically over time.<br/>
+      Buildings unlock progress toward the next Era.
+    </div>
+  </div>
 
-<div class="card">
-<h2>Realm Chronicle</h2>
-<div id="chronicle" class="log"></div>
-</div>
-</div>
+  <footer>
+    Era 1 is fast and forgiving.<br/>
+    Future eras will slow time and reward planning.
+  </footer>
+</main>
 
 <script>
-/* ================= STATE ================= */
-let S = {
-  era: 1,
-  population: 10,
-  production: 30,
-  totalProduction: 0,
-  stability: 100,
+const DEFAULT = {
+  pop: 10,
+  prod: 30,
+  stab: 100,
   time: 0,
-
-  settlements: 0,
-  workshops: 0,
-  council: false,
-
-  citySize: 9,
-  city: Array(9).fill(null),
-
-  cooldown: 0,
-  cooldownMax: 8
+  era: 1,
+  lastAction: 0,
+  buildings: [],
+  events: []
 };
 
-/* ================= PERSISTENCE ================= */
-const SAVE_KEY = "idle_realm_save";
+let state = JSON.parse(localStorage.getItem("idleRealm")) || DEFAULT;
 
-function saveGame(){
-  localStorage.setItem(SAVE_KEY, JSON.stringify(S));
-}
-function loadGame(){
-  const data = localStorage.getItem(SAVE_KEY);
-  if(data){
-    S = JSON.parse(data);
-  }
-}
-
-/* ================= TEXT ================= */
-const chronicles = {
-  1:[
-    "Small clans gather around fire and stone.",
-    "Growth is fast, but fragile.",
-    "The first settlements define survival."
-  ],
-  2:[
-    "Bronze reshapes tools and power.",
-    "Progress slows, choices deepen.",
-    "Metal binds the fate of nations."
-  ]
+const COST = {
+  settlement:15,
+  workshop:20,
+  council:30
 };
 
-let chronicleIndex = 0;
+const COOLDOWN = 10;
 
-/* ================= HELPERS ================= */
-const $=id=>document.getElementById(id);
-const log=t=>{$("events").innerHTML="• "+t+"<br>"+$("events").innerHTML;}
-function emptySlot(){return S.city.findIndex(t=>t===null);}
+const city = document.getElementById("city");
+const events = document.getElementById("events");
 
-/* ================= UI ================= */
-function renderCity(){
-  $("city").innerHTML="";
-  S.city.forEach(t=>{
-    const d=document.createElement("div");
-    d.className="tile";
-    d.textContent=t||"";
-    $("city").appendChild(d);
-  });
+function save(){ localStorage.setItem("idleRealm",JSON.stringify(state)); }
+
+function log(msg){
+  state.events.unshift("• "+msg);
+  state.events = state.events.slice(0,8);
 }
 
-function updateChronicle(){
-  const arr=chronicles[S.era];
-  $("chronicle").textContent=arr[chronicleIndex];
-  chronicleIndex=(chronicleIndex+1)%arr.length;
+function canAct(){
+  return Date.now() - state.lastAction > COOLDOWN*1000;
 }
 
-function updateObjectives(){
-  let html="";
-  if(S.era===1){
-    const o1 = S.settlements + S.workshops + (S.council?1:0) >= 5 && S.workshops>=1;
-    const o2 = S.population>=35 && S.stability>=60;
-    const o3 = S.totalProduction>=100;
+function update(){
+  document.getElementById("pop").innerText = state.pop.toFixed(1);
+  document.getElementById("prod").innerText = state.prod.toFixed(1);
+  document.getElementById("stab").innerText = Math.max(0,Math.min(100,state.stab)).toFixed(0);
+  document.getElementById("time").innerText = state.time;
 
-    html += `<div class="objective ${o1?'done':''}">• Build 5 buildings (1 Workshop)</div>`;
-    html += `<div class="objective ${o2?'done':''}">• Reach 35 population (60% stability)</div>`;
-    html += `<div class="objective ${o3?'done':''}">• Accumulate 100 production</div>`;
+  document.getElementById("costs").innerText =
+    `Settlement: ${COST.settlement} prod | Workshop: ${COST.workshop} | Council: ${COST.council}`;
 
-    if(o1 && o2 && o3){
-      advanceEra();
-    }
+  document.getElementById("cooldown").innerText =
+    canAct() ? "Ready for decision" : `Cooldown ${Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000)}s`;
+
+  city.innerHTML="";
+  for(let i=0;i<12;i++){
+    const t=document.createElement("div");
+    t.className="tile";
+    t.innerText = state.buildings[i] || "⬜";
+    city.appendChild(t);
   }
-  $("objectives").innerHTML=html;
-}
 
-function updateUI(){
-  $("pop").textContent=S.population.toFixed(1);
-  $("prod").textContent=S.production.toFixed(1);
-  $("stab").textContent=Math.max(0,Math.min(100,S.stability)).toFixed(0);
-  $("time").textContent=S.time;
+  events.innerHTML = state.events.map(e=>`<div>${e}</div>`).join("");
+  document.getElementById("eraText").innerText =
+    state.era===1
+    ? "Foundations — fast growth. Learn the rules."
+    : "Age of Bronze — coming soon";
 
-  $("bSettlement").disabled=!canBuild("settlement");
-  $("bWorkshop").disabled=!canBuild("workshop");
-  $("bCouncil").disabled=!canBuild("council");
+  document.getElementById("btnSettle").disabled =
+    !canAct() || state.prod < COST.settlement || state.buildings.length>=12;
 
-  $("cooldown").textContent=S.cooldown>0?`Cooldown: ${S.cooldown}s`:"";
+  document.getElementById("btnWork").disabled =
+    !canAct() || state.prod < COST.workshop || state.buildings.length>=12;
 
-  $("eraText").innerHTML=
-    S.era===1
-    ? "<b>Age of Clans</b><br>Fast growth. Learning phase."
-    : "<b>Age of Bronze</b><br>Slower progress. Strategic depth.";
+  document.getElementById("btnCouncil").disabled =
+    !canAct() || state.prod < COST.council || state.buildings.includes("🏛️");
 
-  renderCity();
-  updateObjectives();
-}
-
-/* ================= ECONOMY ================= */
-function prodPerSecond(){
-  if(S.era===1){
-    return 0.2 + S.workshops*0.6;
-  }
-  return 0.1 + Math.pow(S.workshops,0.8)*0.5;
-}
-
-/* ================= BUILD ================= */
-function canBuild(type){
-  if(S.cooldown>0) return false;
-  if(emptySlot()<0) return false;
-
-  if(type==="settlement") return S.production>=15;
-  if(type==="workshop") return S.production>=20;
-  if(type==="council") return S.production>=30 && !S.council;
-  return false;
+  save();
 }
 
 function build(type){
-  if(!canBuild(type)) return;
-  const slot=emptySlot();
-  S.cooldown=S.cooldownMax;
+  if(!canAct()) return;
 
   if(type==="settlement"){
-    S.production-=15;
-    S.population+=S.era===1?4:2;
-    S.stability-=6;
-    S.settlements++;
-    S.city[slot]="🏠";
-    log("Settlement expands population");
+    state.prod-=COST.settlement;
+    state.pop+=4;
+    state.stab-=5;
+    state.buildings.push("🏠");
+    log("Settlement built (+4 population)");
   }
+
   if(type==="workshop"){
-    S.production-=20;
-    S.workshops++;
-    S.stability-=4;
-    S.city[slot]="🛠";
-    log("Workshop improves production");
+    state.prod-=COST.workshop;
+    state.prod+=5;
+    state.stab-=3;
+    state.buildings.push("⚒️");
+    log("Workshop built (+production)");
   }
+
   if(type==="council"){
-    S.production-=30;
-    S.stability+=20;
-    S.council=true;
-    S.city[slot]="🏛";
-    log("Council brings order");
+    state.prod-=COST.council;
+    state.stab+=15;
+    state.buildings.push("🏛️");
+    log("Council established (+stability)");
   }
-  saveGame();
-  updateUI();
+
+  state.lastAction = Date.now();
+  update();
 }
 
-/* ================= ERA TRANSITION ================= */
-function advanceEra(){
-  if(S.era!==1) return;
-  S.era=2;
-  S.citySize=12;
-  S.city.push(null,null,null);
-  S.cooldownMax=12;
-  log("⚔️ The Age of Bronze begins!");
-  updateChronicle();
-  saveGame();
-}
+document.getElementById("btnSettle").onclick=()=>build("settlement");
+document.getElementById("btnWork").onclick=()=>build("workshop");
+document.getElementById("btnCouncil").onclick=()=>build("council");
 
-/* ================= BUTTONS ================= */
-bSettlement.onclick=()=>build("settlement");
-bWorkshop.onclick=()=>build("workshop");
-bCouncil.onclick=()=>build("council");
-
-/* ================= TICK ================= */
 setInterval(()=>{
-  S.time++;
-  const p=prodPerSecond();
-  S.production+=p;
-  S.totalProduction+=p;
-  if(S.cooldown>0) S.cooldown--;
-  if(S.time%10===0) updateChronicle();
-  saveGame();
-  updateUI();
+  state.time++;
+  state.prod += Math.max(1,state.buildings.filter(b=>b==="⚒️").length*0.6);
+  if(state.stab<100) state.stab+=0.1;
+  update();
 },1000);
 
-/* ================= INIT ================= */
-loadGame();
-updateChronicle();
-updateUI();
-renderCity();
+update();
 </script>
-
 </body>
 </html>
