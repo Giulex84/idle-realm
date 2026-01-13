@@ -1,12 +1,21 @@
 # Idle Realm
 
-Idle Realm is an idle strategy game built for the Pi Network ecosystem.
+Idle Realm is a mobile-first idle strategy game focused on irreversible decisions
+and long-term planning.
 
-## Tech
-- React
-- TypeScript
-- Vite
-- Pi Network SDK
+Players guide a realm through historical eras, balancing production, stability,
+and strategic space.
 
-## Status
-Early development. Authentication first.
+## Features
+- No paywalls
+- No ads
+- No personal data collection
+- Fully client-side
+- Designed for Pi Browser
+
+## Current Eras
+- Foundations
+- Age of Bronze
+- Iron Age (Industrial Preparation)
+
+Future updates will introduce external pressure and conflict systems.
