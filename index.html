@@ -1,35 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Idle Realm</title>
 
 <style>
-body {
+body{
   margin:0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont;
-  background: radial-gradient(circle at top, #14213d, #020617);
+  font-family:system-ui,-apple-system;
+  background:radial-gradient(circle at top,#1b2a4a,#050914);
   color:#e5e7eb;
 }
-header {
-  padding:12px;
-  font-size:14px;
+header{
+  padding:10px;
   display:flex;
   justify-content:space-around;
-  background:#020617;
+  background:#050914;
+  font-size:14px;
 }
-h1 { margin:20px 16px 0; font-size:32px; }
-p.subtitle { margin:4px 16px 16px; opacity:0.7 }
+.container{padding:16px;max-width:420px;margin:auto}
+h1{margin:8px 0 0;font-size:30px}
+.subtitle{opacity:.7;margin-bottom:16px}
 
-.card {
-  margin:16px;
-  padding:16px;
+.card{
+  background:rgba(255,255,255,.06);
   border-radius:16px;
-  background:rgba(255,255,255,0.05);
+  padding:16px;
+  margin-bottom:18px;
 }
-
-button {
+button{
   width:100%;
   padding:14px;
   margin-top:10px;
@@ -39,30 +39,24 @@ button {
   background:#2563eb;
   color:white;
 }
-button:disabled {
-  opacity:0.4;
-}
+button:disabled{opacity:.4}
 
-.grid {
+.grid{
   display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:12px;
 }
-
-.tile {
+.tile{
   height:70px;
   border-radius:14px;
-  background:rgba(255,255,255,0.08);
+  background:rgba(255,255,255,.08);
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:32px;
+  font-size:30px;
 }
-
-.log {
-  font-size:14px;
-  opacity:0.85;
-}
+.log{font-size:14px;opacity:.85}
+.cooldown{color:#facc15;font-weight:600}
 </style>
 </head>
 
@@ -75,26 +69,26 @@ button:disabled {
   ⏳ <span id="time"></span>
 </header>
 
+<div class="container">
 <h1>Idle Realm</h1>
-<p class="subtitle">A living world shaped by time and choices</p>
+<div class="subtitle">A living world shaped by time and choices</div>
 
 <div class="card">
 <h2>Build</h2>
 <button id="bSettlement">🏠 Settlement</button>
-<button id="bWorkshop">🛠️ Workshop</button>
-<button id="bCouncil">🏛️ Council</button>
-<div id="costs"></div>
-<div id="cooldown"></div>
+<button id="bWorkshop">🛠 Workshop</button>
+<button id="bCouncil">🏛 Council</button>
+<div id="cooldown" class="cooldown"></div>
 </div>
 
 <div class="card">
 <h2>City</h2>
-<div class="grid" id="city"></div>
+<div id="city" class="grid"></div>
 </div>
 
 <div class="card">
 <h2>Era</h2>
-<div>Foundations — slow growth. Every choice matters.</div>
+<div id="eraText"></div>
 </div>
 
 <div class="card">
@@ -106,153 +100,160 @@ button:disabled {
 <h2>Realm Chronicle</h2>
 <div id="chronicle" class="log"></div>
 </div>
+</div>
 
 <script>
-/* ==== STATE ==== */
+/* ===== STATE ===== */
+let era = 1; // 1=Clans, 2=Bronze
 let population = 10;
 let production = 30;
 let stability = 100;
 let time = 0;
 
-let settlements = 0;
-let workshops = 0;
-let councilBuilt = false;
-
-let cooldown = 0;
-const COOLDOWN_MAX = 10;
-
-const citySize = 9;
+let settlements=0, workshops=0, council=false;
+let citySize = 9;
 let city = Array(citySize).fill(null);
 
-/* ==== UI ==== */
-const popEl = document.getElementById("pop");
-const prodEl = document.getElementById("prod");
-const stabEl = document.getElementById("stab");
-const timeEl = document.getElementById("time");
-const eventsEl = document.getElementById("events");
-const cityEl = document.getElementById("city");
-const costsEl = document.getElementById("costs");
-const cdEl = document.getElementById("cooldown");
+let cooldown = 0;
+let COOLDOWN_MAX = 8;
 
-/* ==== CHRONICLE ==== */
-const chronicleTexts = [
- "The first clans gather around fire and stone.",
- "Population needs shelter to grow.",
- "Workshops turn effort into progress.",
- "Order preserves stability.",
- "A stronger age lies ahead: Bronze.",
- "Every decision echoes through time."
-];
-let chronicleIndex = 0;
+/* ===== TEXT ===== */
+const chronicles = {
+  1:[
+    "Small clans gather around fire and stone.",
+    "Growth is fast, but fragile.",
+    "The first settlements define survival."
+  ],
+  2:[
+    "Bronze reshapes tools and power.",
+    "Progress slows, choices deepen.",
+    "Metal binds the fate of nations."
+  ]
+};
 
-function updateChronicle(){
- document.getElementById("chronicle").textContent =
- chronicleTexts[chronicleIndex];
- chronicleIndex = (chronicleIndex+1)%chronicleTexts.length;
-}
-
-/* ==== HELPERS ==== */
-function log(msg){
- eventsEl.innerHTML = "• " + msg + "<br>" + eventsEl.innerHTML;
-}
+/* ===== HELPERS ===== */
+const $=id=>document.getElementById(id);
+const log=t=>$("events").innerHTML="• "+t+"<br>"+$("events").innerHTML;
 
 function renderCity(){
- cityEl.innerHTML="";
- city.forEach(t=>{
-  const d=document.createElement("div");
-  d.className="tile";
-  d.textContent=t||"";
-  cityEl.appendChild(d);
- });
+  $("city").innerHTML="";
+  city.forEach(t=>{
+    const d=document.createElement("div");
+    d.className="tile";
+    d.textContent=t||"";
+    $("city").appendChild(d);
+  });
 }
+function emptySlot(){return city.findIndex(t=>t===null);}
 
-function emptySlot(){
- return city.findIndex(t=>t===null);
-}
-
+/* ===== UI ===== */
 function updateUI(){
- popEl.textContent=population.toFixed(1);
- prodEl.textContent=production.toFixed(1);
- stabEl.textContent=Math.max(0,Math.min(100,stability)).toFixed(0);
- timeEl.textContent=time;
+  $("pop").textContent=population.toFixed(1);
+  $("prod").textContent=production.toFixed(1);
+  $("stab").textContent=Math.max(0,Math.min(100,stability)).toFixed(0);
+  $("time").textContent=time;
 
- costsEl.innerHTML=
-  `Settlement: 15 prod<br>
-   Workshop: 20 prod<br>
-   Council: 30 prod`;
+  $("bSettlement").disabled=!canBuild("settlement");
+  $("bWorkshop").disabled=!canBuild("workshop");
+  $("bCouncil").disabled=!canBuild("council");
 
- cdEl.textContent = cooldown>0
- ? `Cooldown: ${cooldown}s before next decision`
- : "";
+  $("cooldown").textContent=
+    cooldown>0?`Cooldown: ${cooldown}s`:"";
 
- document.getElementById("bSettlement").disabled =
-  cooldown>0 || production<15 || emptySlot()<0;
-
- document.getElementById("bWorkshop").disabled =
-  cooldown>0 || production<20 || emptySlot()<0;
-
- document.getElementById("bCouncil").disabled =
-  cooldown>0 || councilBuilt || production<30 || emptySlot()<0;
+  $("eraText").innerHTML =
+    era===1
+    ? "<b>Age of Clans</b><br>Fast growth. Learning phase."
+    : "<b>Age of Bronze</b><br>Slower progress. Strategic depth.";
 }
 
-/* ==== BUILD ACTIONS ==== */
+/* ===== ECONOMY (ERA BASED) ===== */
+function productionPerSecond(){
+  if(era===1){
+    return 0.2 + workshops*0.6;
+  }
+  // ERA 2 slower
+  return 0.1 + Math.pow(workshops,0.8)*0.5;
+}
+
+/* ===== BUILD RULES ===== */
+function canBuild(type){
+  if(cooldown>0) return false;
+  if(emptySlot()<0) return false;
+
+  if(type==="settlement") return production>=15;
+  if(type==="workshop") return production>=20;
+  if(type==="council") return production>=30 && !council;
+  return false;
+}
+
 function build(type){
- if(cooldown>0) return;
+  if(!canBuild(type)) return;
+  const slot=emptySlot();
+  cooldown=COOLDOWN_MAX;
 
- const slot = emptySlot();
- if(slot<0){ log("No empty tiles"); return; }
+  if(type==="settlement"){
+    production-=15;
+    population+= era===1 ? 4 : 2;
+    stability-=6;
+    settlements++;
+    city[slot]="🏠";
+    log("Settlement expands population");
+  }
 
- if(type==="settlement"){
-  production-=15;
-  population+=4;
-  stability-=6;
-  settlements++;
-  city[slot]="🏠";
-  log("Settlement built (+4 pop, -6 stability)");
- }
+  if(type==="workshop"){
+    production-=20;
+    workshops++;
+    stability-=4;
+    city[slot]="🛠";
+    log("Workshop improves production");
+  }
 
- if(type==="workshop"){
-  production-=20;
-  workshops++;
-  city[slot]="🛠️";
-  log("Workshop built (+prod over time)");
- }
+  if(type==="council"){
+    production-=30;
+    stability+=20;
+    council=true;
+    city[slot]="🏛";
+    log("Council brings order");
+  }
 
- if(type==="council"){
-  production-=30;
-  stability+=15;
-  councilBuilt=true;
-  city[slot]="🏛️";
-  log("Council established (+15 stability)");
- }
-
- cooldown=COOLDOWN_MAX;
- updateUI();
+  checkEraTransition();
+  updateUI();
+  renderCity();
 }
 
-/* ==== BUTTONS ==== */
+/* ===== ERA TRANSITION ===== */
+function checkEraTransition(){
+  if(era===1 && city.every(t=>t!==null) && stability>=60){
+    era=2;
+    citySize=12;
+    city.push(null,null,null);
+    COOLDOWN_MAX=12;
+    log("⚔️ The Age of Bronze begins!");
+    updateChronicle();
+  }
+}
+
+/* ===== CHRONICLE ===== */
+let chronicleIndex=0;
+function updateChronicle(){
+  const arr=chronicles[era];
+  $("chronicle").textContent=arr[chronicleIndex];
+  chronicleIndex=(chronicleIndex+1)%arr.length;
+}
+
+/* ===== BUTTONS ===== */
 bSettlement.onclick=()=>build("settlement");
 bWorkshop.onclick=()=>build("workshop");
 bCouncil.onclick=()=>build("council");
 
-/* ==== TICK ==== */
+/* ===== TICK ===== */
 setInterval(()=>{
- time++;
-
- if(workshops>0){
-  production += workshops * 0.6;
- }
-
- if(population>settlements*6){
-  stability -= 0.1;
- }
-
- if(cooldown>0) cooldown--;
-
- if(time%8===0) updateChronicle();
-
- updateUI();
- renderCity();
+  time++;
+  production+=productionPerSecond();
+  if(cooldown>0) cooldown--;
+  if(time%10===0) updateChronicle();
+  updateUI();
+  renderCity();
 },1000);
 
 updateChronicle();
