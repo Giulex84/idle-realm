@@ -8,9 +8,9 @@
 <style>
 :root{
   --bg:#0b1220;
-  --card:#141c33;
+  --card:#141933;
   --card2:#1b2546;
-  --accent:#2f6bff;
+  --accent:#2f5bff;
   --text:#e6ecff;
   --muted:#9aa4c7;
 }
@@ -26,15 +26,18 @@ body{
 header{
   position:sticky;
   top:0;
+  z-index:10;
   background:#060b18;
-  padding:8px 12px;
   display:flex;
   justify-content:space-between;
+  padding:10px 12px;
   font-size:14px;
-  z-index:10;
 }
 
-main{padding:16px;max-width:500px;margin:auto}
+main{padding:16px;max-width:520px;margin:auto}
+
+h1{margin:0 0 4px}
+.small{font-size:13px;color:var(--muted)}
 
 .card{
   background:linear-gradient(180deg,var(--card),var(--card2));
@@ -45,16 +48,16 @@ main{padding:16px;max-width:500px;margin:auto}
 
 button{
   width:100%;
-  border:none;
+  padding:16px;
   border-radius:14px;
-  padding:14px;
-  margin-bottom:10px;
+  border:none;
   background:var(--accent);
   color:white;
   font-size:16px;
+  margin-bottom:10px;
 }
 
-button:disabled{opacity:.4}
+button:disabled{opacity:.45}
 
 .grid{
   display:grid;
@@ -65,14 +68,15 @@ button:disabled{opacity:.4}
 .tile{
   background:#0f1730;
   border-radius:12px;
-  height:70px;
+  height:72px;
   display:flex;
   align-items:center;
   justify-content:center;
   font-size:28px;
+  transition:transform .12s ease;
 }
 
-.small{font-size:13px;color:var(--muted)}
+.highlight{color:#fff;font-weight:600}
 </style>
 </head>
 
@@ -86,39 +90,40 @@ button:disabled{opacity:.4}
 </header>
 
 <main>
-  <h1>Idle Realm</h1>
-  <div class="small">A living world shaped by time and choices</div>
 
-  <div class="card">
-    <h2>Build</h2>
-    <button id="btnSettle">🏠 Settlement</button>
-    <button id="btnWork">⚒️ Workshop</button>
-    <button id="btnCouncil">🏛️ Council</button>
-    <div class="small" id="info"></div>
-  </div>
+<h1>Idle Realm</h1>
+<div class="small">A living world shaped by time and choices</div>
 
-  <div class="card">
-    <h2>City</h2>
-    <div class="grid" id="city"></div>
-  </div>
+<div class="card">
+  <h2>Build</h2>
 
-  <div class="card">
-    <h2>Era</h2>
-    <div><b>Foundations</b> — fast growth to understand the game.</div>
-  </div>
+  <button id="btnSettle">🏠 Settle New Families</button>
+  <button id="btnWork">⚒️ Expand Craftsmanship</button>
+  <button id="btnCouncil">🏛️ Form the Council</button>
 
-  <div class="card">
-    <h2>Events</h2>
-    <div id="events"></div>
-    <div class="small" style="margin-top:8px">
-      Production grows over time.<br/>
-      Buildings occupy limited slots.
-    </div>
-  </div>
+  <div class="small" id="info"></div>
+</div>
+
+<div class="card">
+  <h2>City</h2>
+  <div class="grid" id="city"></div>
+</div>
+
+<div class="card">
+  <h2>Era</h2>
+  <div><b>Foundations</b></div>
+  <div class="small" id="eraDesc"></div>
+</div>
+
+<div class="card">
+  <h2>Events</h2>
+  <div id="events"></div>
+</div>
+
 </main>
 
 <script>
-/* ===== FOUNDATIONS BASELINE — DO NOT REBALANCE ===== */
+/* ==== FOUNDATIONS BASELINE — DO NOT REBALANCE ==== */
 
 const MAX_SLOTS = 9;
 const COOLDOWN = 8;
@@ -136,8 +141,10 @@ const DEFAULT = {
   stab: 100,
   time: 0,
   lastAction: 0,
-  buildings: ["⚒️"], // 1 workshop iniziale
-  events: ["• Realm founded with basic craftsmanship"]
+  buildings: ["⚒️"],
+  events: ["Realm founded with basic craftsmanship"],
+  phase: 0,
+  foundationsDone: false
 };
 
 function loadState(){
@@ -147,65 +154,84 @@ function loadState(){
   }catch{
     return structuredClone(DEFAULT);
   }
-  if(!s || typeof s !== "object") return structuredClone(DEFAULT);
-
-  // ripristino difensivo
+  if(!s || typeof s!=="object") return structuredClone(DEFAULT);
   for(const k in DEFAULT){
-    if(typeof s[k] !== typeof DEFAULT[k]) s[k] = DEFAULT[k];
+    if(typeof s[k] !== typeof DEFAULT[k]) s[k]=DEFAULT[k];
   }
-  if(!Array.isArray(s.buildings)) s.buildings = ["⚒️"];
-  if(!Array.isArray(s.events)) s.events = [];
-
+  if(!Array.isArray(s.buildings)) s.buildings=["⚒️"];
+  if(!Array.isArray(s.events)) s.events=[];
   return s;
 }
 
 let state = loadState();
 
 function save(){
-  localStorage.setItem("idleRealm", JSON.stringify(state));
+  localStorage.setItem("idleRealm",JSON.stringify(state));
 }
 
-function log(msg){
-  state.events.unshift("• " + msg);
-  state.events = state.events.slice(0,10);
+function log(msg,important=false){
+  state.events.unshift((important?"★ ":"• ")+msg);
+  state.events=state.events.slice(0,6);
 }
 
 function canAct(){
-  return Date.now() - state.lastAction >= COOLDOWN * 1000;
+  return Date.now()-state.lastAction >= COOLDOWN*1000;
+}
+
+function checkFoundationsProgress(){
+  if(state.era!=="foundations") return;
+
+  if(state.phase===0 && state.buildings.length>=2){
+    state.phase=1;
+    log("Craftsmanship spreads across the land");
+  }
+  if(state.phase===1 && state.pop>=20){
+    state.phase=2;
+    log("Families gather around a growing settlement");
+  }
+  if(state.phase===2 && state.buildings.includes("🏛️")){
+    state.phase=3;
+    state.foundationsDone=true;
+    log("Order is established. The realm stands strong.",true);
+  }
 }
 
 function update(){
   pop.innerText = state.pop.toFixed(1);
-  prod.innerText = state.prod.toFixed(1);
+  prod.innerText = state.prod.toFixed(0);
   stab.innerText = Math.max(0,Math.min(100,state.stab)).toFixed(0);
   time.innerText = state.time;
 
   const cd = Math.max(0,
-    Math.ceil((COOLDOWN*1000 - (Date.now()-state.lastAction))/1000)
+    Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000)
   );
 
-  info.innerText =
-    `Settlement ${COST.settlement} | Workshop ${COST.workshop} | Council ${COST.council}` +
-    (canAct() ? " • Ready" : ` • Cooldown ${cd}s`);
+  info.innerText = canAct()
+    ? "Choose how your realm grows"
+    : `Your people are busy… ${cd}s`;
 
   btnSettle.disabled =
-    !canAct() || state.prod < COST.settlement || state.buildings.length >= MAX_SLOTS;
+    !canAct() || state.prod < COST.settlement || state.buildings.length>=MAX_SLOTS;
 
   btnWork.disabled =
-    !canAct() || state.prod < COST.workshop || state.buildings.length >= MAX_SLOTS;
+    !canAct() || state.prod < COST.workshop || state.buildings.length>=MAX_SLOTS;
 
   btnCouncil.disabled =
     !canAct() || state.prod < COST.council || state.buildings.includes("🏛️");
 
-  city.innerHTML = "";
+  city.innerHTML="";
   for(let i=0;i<MAX_SLOTS;i++){
     const t=document.createElement("div");
     t.className="tile";
-    t.innerText = state.buildings[i] || "⬜";
+    t.innerText=state.buildings[i]||"";
     city.appendChild(t);
   }
 
-  events.innerHTML = state.events.map(e=>`<div>${e}</div>`).join("");
+  eraDesc.innerText = state.foundationsDone
+    ? "The realm is stable and ready to grow beyond survival."
+    : "Fast growth to understand the basics of the realm.";
+
+  events.innerHTML = state.events.map(e=>`<div class="small">${e}</div>`).join("");
   save();
 }
 
@@ -213,45 +239,45 @@ function build(type){
   if(!canAct()) return;
 
   if(type==="settlement"){
-    state.prod -= COST.settlement;
-    state.pop += 4;
-    state.stab -= 6;
+    state.prod-=COST.settlement;
+    state.pop+=4;
+    state.stab-=6;
     state.buildings.push("🏠");
-    log("Settlement built");
+    log("New families settle the land");
   }
 
   if(type==="workshop"){
-    state.prod -= COST.workshop;
+    state.prod-=COST.workshop;
     state.buildings.push("⚒️");
-    log("Workshop built");
+    log("A workshop begins its craft");
   }
 
   if(type==="council"){
-    state.prod -= COST.council;
-    state.stab += 15;
+    state.prod-=COST.council;
+    state.stab+=15;
     state.buildings.push("🏛️");
-    log("Council established");
+    log("The people demand order. A council is formed.",true);
   }
 
-  state.lastAction = Date.now();
+  state.lastAction=Date.now();
   update();
 }
 
-btnSettle.onclick = () => build("settlement");
-btnWork.onclick   = () => build("workshop");
-btnCouncil.onclick= () => build("council");
+btnSettle.onclick=()=>build("settlement");
+btnWork.onclick=()=>build("workshop");
+btnCouncil.onclick=()=>build("council");
 
 setInterval(()=>{
   state.time++;
-
   const workshops = state.buildings.filter(b=>b==="⚒️").length;
-  state.prod += workshops * 0.8;
-
-  if(state.stab < 100) state.stab += 0.1;
+  state.prod += workshops*0.8;
+  if(state.stab<100) state.stab+=0.1;
+  checkFoundationsProgress();
   update();
 },1000);
 
 update();
 </script>
+
 </body>
 </html>
