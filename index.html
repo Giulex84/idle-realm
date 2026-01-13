@@ -22,6 +22,49 @@ body{
   background:linear-gradient(180deg,#0a1020,#050814);
   color:var(--text);
 }
+
+/* ---------- ONBOARDING ---------- */
+#onboarding{
+  position:fixed;
+  inset:0;
+  background:linear-gradient(180deg,#060b18,#02040a);
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+#onboarding.hidden{display:none}
+.on-card{
+  max-width:520px;
+  background:linear-gradient(180deg,var(--card),var(--card2));
+  border-radius:18px;
+  padding:20px;
+}
+.on-card h2{margin-top:0}
+.on-scroll{
+  max-height:260px;
+  overflow:auto;
+  font-size:13px;
+  color:var(--muted);
+  background:#0f1730;
+  padding:12px;
+  border-radius:12px;
+  margin-bottom:12px;
+}
+label{font-size:14px}
+button{
+  width:100%;
+  border:none;
+  border-radius:14px;
+  padding:14px;
+  background:var(--accent);
+  color:white;
+  font-size:16px;
+}
+button:disabled{opacity:.4}
+
+/* ---------- GAME ---------- */
 header{
   position:sticky;top:0;z-index:10;
   background:#060b18;
@@ -37,20 +80,7 @@ main{padding:16px;max-width:520px;margin:auto}
   padding:16px;
   margin-bottom:18px;
 }
-h1{margin:8px 0 4px}
-h2{margin:0 0 12px}
 .small{font-size:13px;color:var(--muted)}
-button{
-  width:100%;
-  border:none;
-  border-radius:14px;
-  padding:14px;
-  margin-bottom:10px;
-  background:var(--accent);
-  color:white;
-  font-size:16px;
-}
-button:disabled{opacity:.4}
 .grid{
   display:grid;
   grid-template-columns:repeat(3,1fr);
@@ -68,12 +98,40 @@ button:disabled{opacity:.4}
 .ok{color:var(--ok)}
 .danger{background:var(--danger)}
 .check{margin:6px 0}
-.locked{opacity:.35}
 </style>
 </head>
 
 <body>
 
+<!-- ================= ONBOARDING ================= -->
+<div id="onboarding">
+  <div class="on-card">
+    <h2>Terms of Service & Privacy Policy</h2>
+
+    <div class="on-scroll">
+      <b>Terms of Service</b><br><br>
+      Idle Realm is provided “as is” for entertainment purposes only.<br>
+      The game is free to play and contains no payments or advertisements.<br>
+      Game mechanics and balance may change during development.<br><br>
+
+      <b>Privacy Policy</b><br><br>
+      Idle Realm does not collect, store, or transmit personal data.<br>
+      No analytics, cookies, or tracking services are used.<br>
+      All game progress is stored locally on your device only.<br>
+      No data is shared with third parties.
+    </div>
+
+    <label>
+      <input type="checkbox" id="acceptChk" />
+      I have read and agree to the Terms of Service and Privacy Policy
+    </label>
+
+    <br><br>
+    <button id="continueBtn" disabled>Continue to Idle Realm</button>
+  </div>
+</div>
+
+<!-- ================= GAME ================= -->
 <header>
   <span>👥 <b id="pop"></b></span>
   <span>🛠 <b id="tools"></b></span>
@@ -82,182 +140,67 @@ button:disabled{opacity:.4}
 </header>
 
 <main>
+  <h1>Idle Realm</h1>
+  <div class="small">A strategic realm shaped by irreversible choices</div>
 
-<h1>Idle Realm</h1>
-<div class="small">A strategic realm shaped by irreversible choices</div>
+  <div class="card">
+    <h2>Era</h2>
+    <b id="eraName"></b>
+    <div class="small" id="eraDesc"></div>
+  </div>
 
-<div class="card">
-  <h2>Era</h2>
-  <div><b id="eraName"></b></div>
-  <div class="small" id="eraDesc"></div>
-</div>
+  <div class="card">
+    <h2>Era Objectives</h2>
+    <div id="objectives"></div>
+    <button id="advanceBtn" disabled>Advance Era</button>
+  </div>
 
-<div class="card">
-  <h2>Era Objectives</h2>
-  <div id="objectives"></div>
-  <button id="advanceBtn" disabled>Advance Era</button>
-</div>
+  <div class="card">
+    <h2>Decisions</h2>
+    <div id="decisions"></div>
+  </div>
 
-<div class="card">
-  <h2>Decisions</h2>
-  <div id="decisions"></div>
-</div>
+  <div class="card">
+    <h2>City</h2>
+    <div class="grid" id="city"></div>
+  </div>
 
-<div class="card">
-  <h2>City</h2>
-  <div class="grid" id="city"></div>
-</div>
+  <div class="card">
+    <h2>Chronicle</h2>
+    <div id="log" class="small"></div>
+  </div>
 
-<div class="card">
-  <h2>Chronicle</h2>
-  <div id="log" class="small"></div>
-</div>
-
-<div class="card">
-  <button class="danger" onclick="resetGame()">Reset Progress (Review Mode)</button>
-  <div class="small">Temporary. Will be removed after review.</div>
-</div>
-
+  <div class="card">
+    <button class="danger" onclick="resetGame()">Reset Progress (Review Mode)</button>
+    <div class="small">Temporary. Will be removed after review.</div>
+  </div>
 </main>
 
 <script>
-/* ---------------- PI SAFE STUB ---------------- */
+/* ================= PI AUTH SAFE ================= */
 const PiSDK = window.Pi || { authenticate: async()=>({user:{uid:"review"}}) };
 PiSDK.authenticate();
 
-/* ---------------- DATA ---------------- */
+/* ================= TERMS GATE ================= */
+const TERMS_KEY="idleRealm_termsAccepted";
+const onboarding=document.getElementById("onboarding");
+if(localStorage.getItem(TERMS_KEY)==="true"){
+  onboarding.classList.add("hidden");
+}
+acceptChk.onchange=()=>continueBtn.disabled=!acceptChk.checked;
+continueBtn.onclick=()=>{
+  localStorage.setItem(TERMS_KEY,"true");
+  onboarding.classList.add("hidden");
+};
+
+/* ================= GAME DATA ================= */
 const ERAS=[
- {id:1,name:"Foundations",desc:"The birth of order and basic governance.",time:15,
+ {id:1,name:"Foundations",desc:"The birth of order and governance.",
   unlock:["FAMILY","WORKSHOP","COUNCIL"],
   obj:{FAMILY:2,WORKSHOP:1,stability:90}},
- {id:2,name:"Age of Bronze",desc:"Industry and specialization emerge.",time:35,
+ {id:2,name:"Age of Bronze",desc:"Industry and specialization emerge.",
   unlock:["MINE","SMELTER"],
   obj:{MINE:1,SMELTER:1,bronze:50,stability:80}},
- {id:3,name:"Iron Age (Preparation)",desc:"Military pressure looms.",time:90,
+ {id:3,name:"Iron Age (Preparation)",desc:"External pressure is anticipated.",
   unlock:["FORGE"],
-  obj:{iron:30,stability:70}}
-];
-
-const BUILDINGS={
- FAMILY:{icon:"🏠",cost:{tools:15},era:1},
- WORKSHOP:{icon:"🛠",cost:{tools:20},era:1},
- COUNCIL:{icon:"🏛",cost:{tools:30},era:1},
- MINE:{icon:"⛏",cost:{tools:40},era:2},
- SMELTER:{icon:"🔥",cost:{tools:60,ore:10},era:2},
- FORGE:{icon:"⚔️",cost:{bronze:40},era:3}
-};
-
-const DEF={
- era:1,time:0,
- res:{pop:1,tools:30,ore:0,bronze:0,iron:0},
- b:{FAMILY:1,WORKSHOP:0,COUNCIL:0,MINE:0,SMELTER:0,FORGE:0},
- stab:100,log:[]
-};
-
-let S=JSON.parse(localStorage.getItem("idleRealm"))||structuredClone(DEF);
-
-/* ---------------- HELPERS ---------------- */
-const era=()=>ERAS.find(e=>e.id===S.era);
-const unlocked=k=>S.era>=BUILDINGS[k].era;
-
-function canAfford(c){
- return Object.entries(c).every(([k,v])=>(S.res[k]||0)>=v);
-}
-
-function objectivesDone(){
- const o=era().obj;
- for(const k in o){
-  if(k==="stability"){ if(S.stab<o[k])return false; }
-  else if(S.b[k]!=null){ if(S.b[k]<o[k])return false; }
-  else if(S.res[k]!=null){ if(S.res[k]<o[k])return false; }
- }
- return true;
-}
-
-/* ---------------- ACTIONS ---------------- */
-function build(k){
- if(!unlocked(k))return;
- if(!canAfford(BUILDINGS[k].cost))return;
- for(const r in BUILDINGS[k].cost)
-  S.res[r]-=BUILDINGS[k].cost[r];
- S.b[k]++; log(k+" built"); save();
-}
-
-function advanceEra(){
- if(!objectivesDone())return;
- if(S.era<ERAS.length){
-  S.era++; log("★ "+era().name+" begins"); save();
- }
-}
-
-function resetGame(){
- localStorage.removeItem("idleRealm");
- location.reload();
-}
-
-function log(t){
- S.log.unshift(t);
- S.log=S.log.slice(0,15);
-}
-
-/* ---------------- TICK ---------------- */
-setInterval(()=>{
- S.time++;
- if(S.b.WORKSHOP)S.res.tools+=0.8;
- if(S.b.MINE)S.res.ore+=0.4;
- if(S.b.SMELTER && S.res.ore>=0.4){S.res.ore-=0.4;S.res.bronze+=0.25;}
- if(S.b.FORGE && S.res.bronze>=0.3){S.res.bronze-=0.3;S.res.iron+=0.15;}
- S.stab=Math.max(0,Math.min(100,100
-   -S.b.MINE*2-S.b.SMELTER*3+S.b.COUNCIL*5));
- render(); save();
-},1000);
-
-function save(){localStorage.setItem("idleRealm",JSON.stringify(S));}
-
-/* ---------------- RENDER ---------------- */
-function render(){
- pop.innerText=S.res.pop.toFixed(1);
- tools.innerText=S.res.tools.toFixed(0);
- stab.innerText=S.stab.toFixed(0);
- time.innerText=S.time;
-
- eraName.innerText=era().name;
- eraDesc.innerText=era().desc;
-
- objectives.innerHTML="";
- for(const k in era().obj){
-  let ok=false;
-  if(k==="stability")ok=S.stab>=era().obj[k];
-  else if(S.b[k]!=null)ok=S.b[k]>=era().obj[k];
-  else ok=S.res[k]>=era().obj[k];
-  objectives.innerHTML+=
-   `<div class="check ${ok?"ok":""}">
-    ${ok?"✔":"☐"} ${k} ${era().obj[k]}
-   </div>`;
- }
- advanceBtn.disabled=!objectivesDone();
- advanceBtn.onclick=advanceEra;
-
- decisions.innerHTML="";
- for(const k in BUILDINGS){
-  if(BUILDINGS[k].era>S.era)continue;
-  const c=BUILDINGS[k].cost;
-  const costTxt=Object.entries(c).map(([r,v])=>`${v} ${r}`).join(" + ");
-  decisions.innerHTML+=
-   `<button ${canAfford(c)?"":"disabled"}
-     onclick="build('${k}')">
-     ${BUILDINGS[k].icon} ${k} (${costTxt})
-    </button>`;
- }
-
- city.innerHTML="";
- for(const k in S.b)
-  for(let i=0;i<S.b[k];i++)
-   city.innerHTML+=`<div class="tile">${BUILDINGS[k].icon}</div>`;
-
- log.innerHTML=S.log.map(l=>"• "+l).join("<br>");
-}
-render();
-</script>
-</body>
-</html>
+  obj:{iron:30,stability:
