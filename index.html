@@ -1,206 +1,344 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Idle Realm</title>
+  <meta charset="UTF-8" />
+  <title>Idle Realm</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<style>
-:root{
-  --bg:#0b1220;
-  --card:#141c33;
-  --card2:#1b2545;
-  --accent:#3b82f6;
-  --danger:#fb7185;
-  --text:#e6ecff;
-  --muted:#9aa4c7;
-  --ok:#22c55e;
-}
-*{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto}
-body{
-  margin:0;
-  background:linear-gradient(180deg,#0a1020,#050814);
-  color:var(--text);
-}
+  <!-- Pi SDK -->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+  <script>
+    Pi.init({ version: "2.0" });
+  </script>
 
-/* ---------- ONBOARDING ---------- */
-#onboarding{
-  position:fixed;
-  inset:0;
-  background:linear-gradient(180deg,#060b18,#02040a);
-  z-index:9999;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-}
-#onboarding.hidden{display:none}
-.on-card{
-  max-width:520px;
-  background:linear-gradient(180deg,var(--card),var(--card2));
-  border-radius:18px;
-  padding:20px;
-}
-.on-card h2{margin-top:0}
-.on-scroll{
-  max-height:260px;
-  overflow:auto;
-  font-size:13px;
-  color:var(--muted);
-  background:#0f1730;
-  padding:12px;
-  border-radius:12px;
-  margin-bottom:12px;
-}
-label{font-size:14px}
-button{
-  width:100%;
-  border:none;
-  border-radius:14px;
-  padding:14px;
-  background:var(--accent);
-  color:white;
-  font-size:16px;
-}
-button:disabled{opacity:.4}
-
-/* ---------- GAME ---------- */
-header{
-  position:sticky;top:0;z-index:10;
-  background:#060b18;
-  padding:8px 12px;
-  display:flex;
-  justify-content:space-between;
-  font-size:14px;
-}
-main{padding:16px;max-width:520px;margin:auto}
-.card{
-  background:linear-gradient(180deg,var(--card),var(--card2));
-  border-radius:18px;
-  padding:16px;
-  margin-bottom:18px;
-}
-.small{font-size:13px;color:var(--muted)}
-.grid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-}
-.tile{
-  height:72px;
-  border-radius:14px;
-  background:#0f1730;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:28px;
-}
-.ok{color:var(--ok)}
-.danger{background:var(--danger)}
-.check{margin:6px 0}
-</style>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: radial-gradient(circle at top, #0e1530, #050814);
+      color: #fff;
+    }
+    .card {
+      background: linear-gradient(180deg, #121c3f, #0b1025);
+      border-radius: 18px;
+      padding: 20px;
+      margin: 16px;
+    }
+    h1, h2, h3 { margin-top: 0; }
+    button {
+      width: 100%;
+      padding: 14px;
+      margin: 6px 0;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      background: #3b82f6;
+      color: #fff;
+    }
+    button:disabled {
+      background: #1e3a8a;
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .danger { background: #fb7185; }
+    .muted { opacity: 0.6; font-size: 14px; }
+    .check { color: #4ade80; }
+    .slot-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+    .slot {
+      height: 64px;
+      border-radius: 12px;
+      background: #0b1333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+    }
+    .cooldown {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+  </style>
 </head>
 
 <body>
 
-<!-- ================= ONBOARDING ================= -->
-<div id="onboarding">
-  <div class="on-card">
-    <h2>Terms of Service & Privacy Policy</h2>
-
-    <div class="on-scroll">
-      <b>Terms of Service</b><br><br>
-      Idle Realm is provided “as is” for entertainment purposes only.<br>
-      The game is free to play and contains no payments or advertisements.<br>
-      Game mechanics and balance may change during development.<br><br>
-
-      <b>Privacy Policy</b><br><br>
-      Idle Realm does not collect, store, or transmit personal data.<br>
-      No analytics, cookies, or tracking services are used.<br>
-      All game progress is stored locally on your device only.<br>
-      No data is shared with third parties.
-    </div>
-
-    <label>
-      <input type="checkbox" id="acceptChk" />
-      I have read and agree to the Terms of Service and Privacy Policy
-    </label>
-
-    <br><br>
-    <button id="continueBtn" disabled>Continue to Idle Realm</button>
-  </div>
+<div id="termsCard" class="card">
+  <h2>Terms of Service & Privacy Policy</h2>
+  <p class="muted">
+    Idle Realm is provided "as is" for entertainment purposes only.
+    No payments or ads are enabled during review.
+    Balance and mechanics may change.
+  </p>
+  <p class="muted">
+    This app does not collect, store, or transmit personal data.
+    No analytics or tracking services are used.
+  </p>
+  <label>
+    <input type="checkbox" id="acceptTerms" />
+    I agree to the Terms of Service and Privacy Policy
+  </label>
+  <button id="enterGame" disabled>Continue to Idle Realm</button>
 </div>
 
-<!-- ================= GAME ================= -->
-<header>
-  <span>👥 <b id="pop"></b></span>
-  <span>🛠 <b id="tools"></b></span>
-  <span>🛡 <b id="stab"></b>%</span>
-  <span>⏳ <b id="time"></b></span>
-</header>
-
-<main>
-  <h1>Idle Realm</h1>
-  <div class="small">A strategic realm shaped by irreversible choices</div>
+<div id="game" style="display:none">
 
   <div class="card">
-    <h2>Era</h2>
-    <b id="eraName"></b>
-    <div class="small" id="eraDesc"></div>
+    <h1>Idle Realm</h1>
+    <p class="muted">A strategic realm shaped by irreversible choices</p>
+    <div id="stats"></div>
   </div>
 
   <div class="card">
-    <h2>Era Objectives</h2>
+    <h2 id="eraTitle"></h2>
+    <p class="muted" id="eraDesc"></p>
+  </div>
+
+  <div class="card">
+    <h3>Era Objectives</h3>
     <div id="objectives"></div>
-    <button id="advanceBtn" disabled>Advance Era</button>
+    <button id="advanceEra" disabled>Advance to Next Era</button>
   </div>
 
   <div class="card">
-    <h2>Decisions</h2>
+    <h3>Decisions</h3>
     <div id="decisions"></div>
+    <p class="muted" id="cooldownText"></p>
   </div>
 
   <div class="card">
-    <h2>City</h2>
-    <div class="grid" id="city"></div>
+    <h3>City Slots</h3>
+    <div class="slot-grid" id="slots"></div>
   </div>
 
   <div class="card">
-    <h2>Chronicle</h2>
-    <div id="log" class="small"></div>
+    <h3>Chronicle</h3>
+    <div id="log" class="muted"></div>
   </div>
 
   <div class="card">
-    <button class="danger" onclick="resetGame()">Reset Progress (Review Mode)</button>
-    <div class="small">Temporary. Will be removed after review.</div>
+    <button class="danger" onclick="resetProgress()">Reset Progress (Review Mode)</button>
+    <p class="muted">Temporary. Will be removed after review.</p>
   </div>
-</main>
+
+</div>
 
 <script>
-/* ================= PI AUTH SAFE ================= */
-const PiSDK = window.Pi || { authenticate: async()=>({user:{uid:"review"}}) };
-PiSDK.authenticate();
+/* ---------------- STATE ---------------- */
+const ERAS = [
+  {
+    id: 1,
+    name: "Tribal Age",
+    desc: "Small settlements and survival.",
+    cooldown: 5000,
+    slots: 5,
+    objectives: () => [
+      { label: "Population ≥ 6", done: state.population >= 6 },
+      { label: "Tools ≥ 40", done: state.tools >= 40 },
+      { label: "Council built", done: state.council >= 1 },
+      { label: "Stability ≥ 80%", done: state.stability >= 80 }
+    ]
+  },
+  {
+    id: 2,
+    name: "Age of Bronze",
+    desc: "Industry and specialization emerge.",
+    cooldown: 8000,
+    slots: () => 5 + state.council,
+    objectives: () => [
+      { label: "Build 1 Mine", done: state.mine >= 1 },
+      { label: "Build 1 Smelter", done: state.smelter >= 1 },
+      { label: "Produce 50 Bronze", done: state.bronze >= 50 },
+      { label: "Stability ≥ 80%", done: state.stability >= 80 }
+    ]
+  },
+  {
+    id: 3,
+    name: "Iron Age",
+    desc: "External threats loom. (Coming soon)",
+    locked: true
+  }
+];
 
-/* ================= TERMS GATE ================= */
-const TERMS_KEY="idleRealm_termsAccepted";
-const onboarding=document.getElementById("onboarding");
-if(localStorage.getItem(TERMS_KEY)==="true"){
-  onboarding.classList.add("hidden");
-}
-acceptChk.onchange=()=>continueBtn.disabled=!acceptChk.checked;
-continueBtn.onclick=()=>{
-  localStorage.setItem(TERMS_KEY,"true");
-  onboarding.classList.add("hidden");
+let state = JSON.parse(localStorage.getItem("idleRealm")) || {
+  era: 1,
+  population: 1,
+  tools: 20,
+  ore: 0,
+  bronze: 0,
+  stability: 100,
+  slotsUsed: [],
+  council: 0,
+  mine: 0,
+  smelter: 0,
+  lastAction: 0,
+  log: []
 };
 
-/* ================= GAME DATA ================= */
-const ERAS=[
- {id:1,name:"Foundations",desc:"The birth of order and governance.",
-  unlock:["FAMILY","WORKSHOP","COUNCIL"],
-  obj:{FAMILY:2,WORKSHOP:1,stability:90}},
- {id:2,name:"Age of Bronze",desc:"Industry and specialization emerge.",
-  unlock:["MINE","SMELTER"],
-  obj:{MINE:1,SMELTER:1,bronze:50,stability:80}},
- {id:3,name:"Iron Age (Preparation)",desc:"External pressure is anticipated.",
-  unlock:["FORGE"],
-  obj:{iron:30,stability:
+/* ---------------- AUTH + TERMS ---------------- */
+Pi.authenticate(["username"], () => {}, () => {});
+const enterBtn = document.getElementById("enterGame");
+document.getElementById("acceptTerms").onchange = e => {
+  enterBtn.disabled = !e.target.checked;
+};
+enterBtn.onclick = () => {
+  document.getElementById("termsCard").style.display = "none";
+  document.getElementById("game").style.display = "block";
+  render();
+};
+
+/* ---------------- GAME LOGIC ---------------- */
+function cooldownReady() {
+  const cd = ERAS[state.era - 1].cooldown;
+  return Date.now() - state.lastAction >= cd;
+}
+
+function action(fn) {
+  if (!cooldownReady()) return;
+  fn();
+  state.lastAction = Date.now();
+  save();
+  render();
+}
+
+function addLog(msg) {
+  state.log.unshift(msg);
+  state.log = state.log.slice(0, 20);
+}
+
+function save() {
+  localStorage.setItem("idleRealm", JSON.stringify(state));
+}
+
+/* ---------------- ACTIONS ---------------- */
+function settle() {
+  action(() => {
+    if (state.tools < 15) return;
+    state.tools -= 15;
+    state.population += 0.5;
+    state.stability -= 2;
+    state.slotsUsed.push("🏠");
+    addLog("Families settled");
+  });
+}
+
+function workshop() {
+  action(() => {
+    state.tools += 5;
+    state.stability -= 1;
+    state.slotsUsed.push("🔧");
+    addLog("Workshop operated");
+  });
+}
+
+function buildCouncil() {
+  action(() => {
+    if (state.tools < 30) return;
+    state.tools -= 30;
+    state.stability += 15;
+    state.council++;
+    state.slotsUsed.push("🏛");
+    addLog("Council established");
+  });
+}
+
+function buildMine() {
+  action(() => {
+    if (state.tools < 40) return;
+    state.tools -= 40;
+    state.mine++;
+    state.slotsUsed.push("⛏");
+    addLog("Mine built");
+  });
+}
+
+function buildSmelter() {
+  action(() => {
+    if (state.tools < 60 || state.ore < 10) return;
+    state.tools -= 60;
+    state.ore -= 10;
+    state.smelter++;
+    state.slotsUsed.push("🔥");
+    addLog("Smelter built");
+  });
+}
+
+/* ---------------- ERA ADVANCE ---------------- */
+function canAdvance() {
+  const era = ERAS[state.era - 1];
+  return era.objectives().every(o => o.done);
+}
+
+function advanceEra() {
+  if (!canAdvance()) return;
+  state.era++;
+  addLog(`Entered ${ERAS[state.era - 1].name}`);
+  save();
+  render();
+}
+
+/* ---------------- RESET ---------------- */
+function resetProgress() {
+  localStorage.removeItem("idleRealm");
+  location.reload();
+}
+
+/* ---------------- RENDER ---------------- */
+function render() {
+  const era = ERAS[state.era - 1];
+
+  document.getElementById("stats").innerHTML = `
+    👥 ${state.population.toFixed(1)} |
+    🔧 ${state.tools} |
+    ⛏ ${state.ore} |
+    🪙 ${state.bronze} |
+    🛡 ${state.stability}%
+  `;
+
+  document.getElementById("eraTitle").innerText = era.name;
+  document.getElementById("eraDesc").innerText = era.desc;
+
+  document.getElementById("objectives").innerHTML =
+    era.objectives().map(o =>
+      `<div>${o.done ? "✔" : "☐"} ${o.label}</div>`
+    ).join("");
+
+  document.getElementById("advanceEra").disabled = !canAdvance();
+  document.getElementById("advanceEra").onclick = advanceEra;
+
+  const decisions = [];
+  if (state.era === 1) {
+    decisions.push(`<button onclick="settle()">🏠 Settle Families (15 tools)</button>`);
+    decisions.push(`<button onclick="workshop()">🔧 Workshop (+5 tools)</button>`);
+    decisions.push(`<button onclick="buildCouncil()">🏛 Council (30 tools)</button>`);
+  }
+  if (state.era === 2) {
+    decisions.push(`<button onclick="buildMine()">⛏ Mine (40 tools)</button>`);
+    decisions.push(`<button onclick="buildSmelter()">🔥 Smelter (60 tools + 10 ore)</button>`);
+    decisions.push(`<button onclick="buildCouncil()">🏛 Council (30 tools)</button>`);
+  }
+
+  document.getElementById("decisions").innerHTML = decisions.join("");
+
+  document.getElementById("slots").innerHTML =
+    Array.from({ length: typeof era.slots === "function" ? era.slots() : era.slots })
+      .map((_, i) => `<div class="slot">${state.slotsUsed[i] || ""}</div>`)
+      .join("");
+
+  document.getElementById("log").innerHTML =
+    state.log.map(l => `<div>• ${l}</div>`).join("");
+
+  const cdLeft = Math.max(0, era.cooldown - (Date.now() - state.lastAction));
+  document.getElementById("cooldownText").innerText =
+    cdLeft > 0 ? `Cooldown: ${(cdLeft / 1000).toFixed(1)}s` : "";
+}
+
+render();
+</script>
+
+</body>
+</html>
