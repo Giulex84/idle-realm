@@ -2,269 +2,262 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Idle Realm</title>
 
 <style>
-  body {
-    margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    background: radial-gradient(circle at top, #0e1a33, #060b1a);
-    color: #eaeaf0;
-  }
+body {
+  margin:0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont;
+  background: radial-gradient(circle at top, #14213d, #020617);
+  color:#e5e7eb;
+}
+header {
+  padding:12px;
+  font-size:14px;
+  display:flex;
+  justify-content:space-around;
+  background:#020617;
+}
+h1 { margin:20px 16px 0; font-size:32px; }
+p.subtitle { margin:4px 16px 16px; opacity:0.7 }
 
-  .topbar {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: 8px;
-    background: rgba(0,0,0,0.4);
-    font-size: 14px;
-  }
+.card {
+  margin:16px;
+  padding:16px;
+  border-radius:16px;
+  background:rgba(255,255,255,0.05);
+}
 
-  .container {
-    padding: 16px;
-  }
+button {
+  width:100%;
+  padding:14px;
+  margin-top:10px;
+  border:none;
+  border-radius:14px;
+  font-size:16px;
+  background:#2563eb;
+  color:white;
+}
+button:disabled {
+  opacity:0.4;
+}
 
-  h1 {
-    margin-top: 10px;
-    font-size: 28px;
-  }
+.grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+}
 
-  .subtitle {
-    opacity: 0.8;
-    margin-bottom: 20px;
-  }
+.tile {
+  height:70px;
+  border-radius:14px;
+  background:rgba(255,255,255,0.08);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:32px;
+}
 
-  .card {
-    background: rgba(255,255,255,0.05);
-    border-radius: 16px;
-    padding: 16px;
-    margin-bottom: 20px;
-  }
-
-  .build-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-
-  button {
-    border: none;
-    border-radius: 14px;
-    padding: 14px;
-    font-size: 16px;
-    font-weight: 600;
-    background: #2d6cff;
-    color: white;
-  }
-
-  button:disabled {
-    background: #2a3555;
-    opacity: 0.5;
-  }
-
-  .city-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-
-  .tile {
-    background: rgba(255,255,255,0.06);
-    border-radius: 14px;
-    height: 70px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-  }
-
-  .events {
-    font-size: 14px;
-    opacity: 0.9;
-  }
-
-  .cooldown {
-    color: #ffd166;
-    margin-top: 8px;
-    font-weight: 600;
-  }
+.log {
+  font-size:14px;
+  opacity:0.85;
+}
 </style>
 </head>
 
 <body>
 
-<div class="topbar">
-  <div>👥 <span id="pop">10</span></div>
-  <div>🛠 <span id="prod">30</span></div>
-  <div>🛡 <span id="stab">100</span>%</div>
-  <div>⏳ <span id="time">0</span></div>
+<header>
+  👥 <span id="pop"></span>
+  ⚒️ <span id="prod"></span>
+  🛡️ <span id="stab"></span>%
+  ⏳ <span id="time"></span>
+</header>
+
+<h1>Idle Realm</h1>
+<p class="subtitle">A living world shaped by time and choices</p>
+
+<div class="card">
+<h2>Build</h2>
+<button id="bSettlement">🏠 Settlement</button>
+<button id="bWorkshop">🛠️ Workshop</button>
+<button id="bCouncil">🏛️ Council</button>
+<div id="costs"></div>
+<div id="cooldown"></div>
 </div>
 
-<div class="container">
-  <h1>Idle Realm</h1>
-  <div class="subtitle">A living world shaped by time and choices</div>
+<div class="card">
+<h2>City</h2>
+<div class="grid" id="city"></div>
+</div>
 
-  <div class="card">
-    <h2>Build</h2>
-    <div class="build-grid">
-      <button id="settlementBtn">🏠 Settlement</button>
-      <button id="workshopBtn">🛠 Workshop</button>
-      <button id="councilBtn">🏛 Council</button>
-    </div>
-    <div class="cooldown" id="cooldownText"></div>
-    <div style="margin-top:8px; font-size:14px;">
-      Settlement: 15 prod<br>
-      Workshop: 20 prod<br>
-      Council: 30 prod
-    </div>
-  </div>
+<div class="card">
+<h2>Era</h2>
+<div>Foundations — slow growth. Every choice matters.</div>
+</div>
 
-  <div class="card">
-    <h2>City</h2>
-    <div class="city-grid" id="cityGrid"></div>
-  </div>
+<div class="card">
+<h2>Events</h2>
+<div id="events" class="log"></div>
+</div>
 
-  <div class="card">
-    <h2>Era</h2>
-    <div id="eraText">
-      <b>Age of Clans</b><br>
-      Small settlements. Fragile balance. Slow growth.
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Events</h2>
-    <div class="events" id="events"></div>
-  </div>
+<div class="card">
+<h2>Realm Chronicle</h2>
+<div id="chronicle" class="log"></div>
 </div>
 
 <script>
-/* ===== GAME STATE ===== */
+/* ==== STATE ==== */
 let population = 10;
-let production = 30; // ⭐ START BOOST
+let production = 30;
 let stability = 100;
 let time = 0;
 
 let settlements = 0;
 let workshops = 0;
-let councils = 0;
-
-let citySlots = Array(9).fill(null);
+let councilBuilt = false;
 
 let cooldown = 0;
-const COOLDOWN_MAX = 8;
+const COOLDOWN_MAX = 10;
 
-/* ===== HELPERS ===== */
-function logEvent(text) {
-  const el = document.getElementById("events");
-  el.innerHTML = "• " + text + "<br>" + el.innerHTML;
+const citySize = 9;
+let city = Array(citySize).fill(null);
+
+/* ==== UI ==== */
+const popEl = document.getElementById("pop");
+const prodEl = document.getElementById("prod");
+const stabEl = document.getElementById("stab");
+const timeEl = document.getElementById("time");
+const eventsEl = document.getElementById("events");
+const cityEl = document.getElementById("city");
+const costsEl = document.getElementById("costs");
+const cdEl = document.getElementById("cooldown");
+
+/* ==== CHRONICLE ==== */
+const chronicleTexts = [
+ "The first clans gather around fire and stone.",
+ "Population needs shelter to grow.",
+ "Workshops turn effort into progress.",
+ "Order preserves stability.",
+ "A stronger age lies ahead: Bronze.",
+ "Every decision echoes through time."
+];
+let chronicleIndex = 0;
+
+function updateChronicle(){
+ document.getElementById("chronicle").textContent =
+ chronicleTexts[chronicleIndex];
+ chronicleIndex = (chronicleIndex+1)%chronicleTexts.length;
 }
 
-function updateUI() {
-  document.getElementById("pop").textContent = population.toFixed(1);
-  document.getElementById("prod").textContent = production.toFixed(1);
-  document.getElementById("stab").textContent = Math.max(0, Math.min(100, stability)).toFixed(0);
-  document.getElementById("time").textContent = time;
-
-  document.getElementById("settlementBtn").disabled = !canBuild("settlement");
-  document.getElementById("workshopBtn").disabled = !canBuild("workshop");
-  document.getElementById("councilBtn").disabled = !canBuild("council");
-
-  document.getElementById("cooldownText").textContent =
-    cooldown > 0 ? `Cooldown: ${cooldown}s` : "";
+/* ==== HELPERS ==== */
+function log(msg){
+ eventsEl.innerHTML = "• " + msg + "<br>" + eventsEl.innerHTML;
 }
 
-/* ===== ECONOMY ===== */
-function productionPerSecond() {
-  const base = 0.15;
-  const workshopProd = Math.pow(workshops, 0.85) * 0.8;
-  return base + workshopProd;
+function renderCity(){
+ cityEl.innerHTML="";
+ city.forEach(t=>{
+  const d=document.createElement("div");
+  d.className="tile";
+  d.textContent=t||"";
+  cityEl.appendChild(d);
+ });
 }
 
-/* ===== BUILD RULES ===== */
-function emptySlotIndex() {
-  return citySlots.findIndex(s => s === null);
+function emptySlot(){
+ return city.findIndex(t=>t===null);
 }
 
-function canBuild(type) {
-  if (cooldown > 0) return false;
-  if (emptySlotIndex() === -1) return false;
+function updateUI(){
+ popEl.textContent=population.toFixed(1);
+ prodEl.textContent=production.toFixed(1);
+ stabEl.textContent=Math.max(0,Math.min(100,stability)).toFixed(0);
+ timeEl.textContent=time;
 
-  if (type === "settlement") return production >= 15;
-  if (type === "workshop") return production >= 20;
-  if (type === "council") return production >= 30 && councils === 0;
+ costsEl.innerHTML=
+  `Settlement: 15 prod<br>
+   Workshop: 20 prod<br>
+   Council: 30 prod`;
 
-  return false;
+ cdEl.textContent = cooldown>0
+ ? `Cooldown: ${cooldown}s before next decision`
+ : "";
+
+ document.getElementById("bSettlement").disabled =
+  cooldown>0 || production<15 || emptySlot()<0;
+
+ document.getElementById("bWorkshop").disabled =
+  cooldown>0 || production<20 || emptySlot()<0;
+
+ document.getElementById("bCouncil").disabled =
+  cooldown>0 || councilBuilt || production<30 || emptySlot()<0;
 }
 
-function build(type) {
-  if (!canBuild(type)) {
-    logEvent("Action blocked");
-    return;
-  }
+/* ==== BUILD ACTIONS ==== */
+function build(type){
+ if(cooldown>0) return;
 
-  cooldown = COOLDOWN_MAX;
-  const slot = emptySlotIndex();
-  if (slot === -1) return;
+ const slot = emptySlot();
+ if(slot<0){ log("No empty tiles"); return; }
 
-  if (type === "settlement") {
-    production -= 15;
-    population += 4;
-    stability -= 6;
-    settlements++;
-    citySlots[slot] = "🏠";
-    logEvent("Settlement built (+4 pop, -6 stability)");
-  }
+ if(type==="settlement"){
+  production-=15;
+  population+=4;
+  stability-=6;
+  settlements++;
+  city[slot]="🏠";
+  log("Settlement built (+4 pop, -6 stability)");
+ }
 
-  if (type === "workshop") {
-    production -= 20;
-    workshops++;
-    stability -= 4;
-    citySlots[slot] = "🛠";
-    logEvent("Workshop built (+production)");
-  }
+ if(type==="workshop"){
+  production-=20;
+  workshops++;
+  city[slot]="🛠️";
+  log("Workshop built (+prod over time)");
+ }
 
-  if (type === "council") {
-    production -= 30;
-    councils++;
-    stability += 20;
-    citySlots[slot] = "🏛";
-    logEvent("Council established (+20 stability)");
-  }
+ if(type==="council"){
+  production-=30;
+  stability+=15;
+  councilBuilt=true;
+  city[slot]="🏛️";
+  log("Council established (+15 stability)");
+ }
 
-  renderCity();
-  updateUI();
+ cooldown=COOLDOWN_MAX;
+ updateUI();
 }
 
-/* ===== CITY ===== */
-function renderCity() {
-  const grid = document.getElementById("cityGrid");
-  grid.innerHTML = "";
-  citySlots.forEach(s => {
-    const d = document.createElement("div");
-    d.className = "tile";
-    d.textContent = s || "";
-    grid.appendChild(d);
-  });
-}
+/* ==== BUTTONS ==== */
+bSettlement.onclick=()=>build("settlement");
+bWorkshop.onclick=()=>build("workshop");
+bCouncil.onclick=()=>build("council");
 
-/* ===== BUTTONS ===== */
-document.getElementById("settlementBtn").onclick = () => build("settlement");
-document.getElementById("workshopBtn").onclick = () => build("workshop");
-document.getElementById("councilBtn").onclick = () => build("council");
+/* ==== TICK ==== */
+setInterval(()=>{
+ time++;
 
-/* ===== GAME LOOP ===== */
-setInterval(() => {
-  time++;
-  production += productionPerSecond();
-  if (cooldown > 0) cooldown--;
-  updateUI();
-}, 1000);
+ if(workshops>0){
+  production += workshops * 0.6;
+ }
 
-renderCity();
+ if(population>settlements*6){
+  stability -= 0.1;
+ }
+
+ if(cooldown>0) cooldown--;
+
+ if(time%8===0) updateChronicle();
+
+ updateUI();
+ renderCity();
+},1000);
+
+updateChronicle();
 updateUI();
+renderCity();
 </script>
 
 </body>
