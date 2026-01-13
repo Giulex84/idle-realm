@@ -11,6 +11,7 @@
   --card:#141933;
   --card2:#1b2546;
   --accent:#2f5bff;
+  --danger:#ff4d6d;
   --text:#e6ecff;
   --muted:#9aa4c7;
 }
@@ -38,6 +39,7 @@ button{
   background:var(--accent);color:white;font-size:16px;
   margin-bottom:10px;
 }
+button.danger{background:var(--danger)}
 button:disabled{opacity:.45}
 .grid{
   display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
@@ -45,8 +47,9 @@ button:disabled{opacity:.45}
 .tile{
   background:#0f1730;border-radius:12px;height:72px;
   display:flex;align-items:center;justify-content:center;
-  font-size:28px;transition:transform .12s ease;
+  font-size:28px;
 }
+.tile.empty{opacity:.15}
 </style>
 </head>
 
@@ -69,27 +72,36 @@ button:disabled{opacity:.45}
 <div class="card">
   <h2>Build</h2>
 
-  <button id="btnSettle">🏠 Settle New Families</button>
-  <button id="btnWork">⚒️ Expand Craftsmanship</button>
-  <button id="btnCouncil">🏛️ Form the Council</button>
+  <button id="btnSettle">
+    🏠 Settle Families <span class="small">(⚒️ 15)</span>
+  </button>
 
-  <button id="btnMine" style="display:none">⛏️ Build Mine</button>
-  <button id="btnSmelter" style="display:none">🔥 Build Smelter</button>
+  <button id="btnWork">
+    ⚒️ Workshop <span class="small">(⚒️ 20)</span>
+  </button>
+
+  <button id="btnCouncil">
+    🏛️ Council <span class="small">(⚒️ 30)</span>
+  </button>
+
+  <button id="btnMine" style="display:none">
+    ⛏️ Mine <span class="small">(⚒️ 40)</span>
+  </button>
+
+  <button id="btnSmelter" style="display:none">
+    🔥 Smelter <span class="small">(⚒️ 60 + 🪨 10)</span>
+  </button>
 
   <div class="small" id="info"></div>
-</div>
-
-<div class="card" id="advanceCard" style="display:none">
-  <h2>Foundations Complete</h2>
-  <div class="small" style="margin-bottom:12px">
-    Your realm is stable and ready to grow beyond survival.
-  </div>
-  <button id="btnAdvance">⏭ Advance to the Age of Bronze</button>
 </div>
 
 <div class="card">
   <h2>City</h2>
   <div class="grid" id="city"></div>
+  <button class="danger" id="btnClear" style="margin-top:12px">
+    🧹 Dismantle Last Building
+  </button>
+  <div class="small">Removing buildings refunds no resources, but frees space.</div>
 </div>
 
 <div class="card">
@@ -106,11 +118,10 @@ button:disabled{opacity:.45}
 </main>
 
 <script>
-/* ==== BASELINE ==== */
-const BASE_SLOTS = 9;
-const COOLDOWN = 8;
+const BASE_SLOTS=9;
+const COOLDOWN=8;
 
-const COST = {
+const COST={
   settlement:15,
   workshop:20,
   council:30,
@@ -118,7 +129,7 @@ const COST = {
   smelter:60
 };
 
-const DEFAULT = {
+const DEFAULT={
   era:"foundations",
   pop:12,
   prod:30,
@@ -127,8 +138,6 @@ const DEFAULT = {
   lastAction:0,
   buildings:["⚒️"],
   events:["Realm founded with basic craftsmanship"],
-  phase:0,
-  foundationsDone:false,
   ore:0,
   bronze:0,
   lastSeen:Date.now()
@@ -138,12 +147,10 @@ function loadState(){
   let s;
   try{s=JSON.parse(localStorage.getItem("idleRealm"));}
   catch{return structuredClone(DEFAULT);}
-  if(!s||typeof s!=="object") return structuredClone(DEFAULT);
   for(const k in DEFAULT)
     if(typeof s[k]!==typeof DEFAULT[k]) s[k]=DEFAULT[k];
   if(!Array.isArray(s.buildings)) s.buildings=["⚒️"];
   if(!Array.isArray(s.events)) s.events=[];
-  if(typeof s.lastAction!=="number") s.lastAction=0;
   return s;
 }
 
@@ -154,37 +161,18 @@ function save(){
   localStorage.setItem("idleRealm",JSON.stringify(state));
 }
 
-function log(msg,important=false){
-  state.events.unshift((important?"★ ":"• ")+msg);
+function log(msg){
+  state.events.unshift("• "+msg);
   state.events=state.events.slice(0,6);
 }
 
 function canAct(){
-  if(!state.lastAction||isNaN(state.lastAction)) return true;
   return Date.now()-state.lastAction>=COOLDOWN*1000;
 }
 
 function maxSlots(){
   return state.era==="bronze"?12:BASE_SLOTS;
 }
-
-function canAdvanceEra(){
-  return state.era==="foundations"
-    && state.buildings.includes("🏛️")
-    && state.buildings.length>=BASE_SLOTS;
-}
-
-function offlineProgress(){
-  const diff=Math.floor((Date.now()-state.lastSeen)/1000);
-  if(diff<=0) return;
-  if(state.era==="bronze"){
-    const mines=state.buildings.filter(b=>b==="⛏️").length;
-    state.ore+=Math.min(mines*diff, mines*3600);
-    log(`You gained ${mines*diff} ore while away`);
-  }
-}
-
-offlineProgress();
 
 function update(){
   pop.innerText=state.pop.toFixed(1);
@@ -194,8 +182,9 @@ function update(){
   bronze.innerText=state.bronze.toFixed(0);
   time.innerText=state.time;
 
-  const cd=Math.max(0,Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000));
-  info.innerText=canAct()?"Choose how your realm grows":`Your people are busy… ${cd}s`;
+  info.innerText=canAct()
+    ?"Your people await your decision"
+    :"The realm is busy…";
 
   btnSettle.disabled=!canAct()||state.prod<COST.settlement||state.buildings.length>=maxSlots();
   btnWork.disabled=!canAct()||state.prod<COST.workshop||state.buildings.length>=maxSlots();
@@ -207,25 +196,18 @@ function update(){
   btnMine.disabled=!canAct()||state.prod<COST.mine||state.buildings.length>=maxSlots();
   btnSmelter.disabled=!canAct()||state.prod<COST.smelter||state.ore<10||state.buildings.length>=maxSlots();
 
-  advanceCard.style.display=canAdvanceEra()?"block":"none";
-
   city.innerHTML="";
   for(let i=0;i<maxSlots();i++){
     const t=document.createElement("div");
-    t.className="tile";
+    t.className="tile"+(state.buildings[i]?"":" empty");
     t.innerText=state.buildings[i]||"";
     city.appendChild(t);
   }
 
-  if(state.era==="foundations"){
-    eraTitle.innerText="Foundations";
-    eraDesc.innerText=state.foundationsDone
-      ?"The realm stands strong. A new age awaits."
-      :"Fast growth to understand the basics.";
-  }else{
-    eraTitle.innerText="Age of Bronze";
-    eraDesc.innerText="Resources, industry and long-term planning emerge.";
-  }
+  eraTitle.innerText=state.era==="foundations"?"Foundations":"Age of Bronze";
+  eraDesc.innerText=state.era==="foundations"
+    ?"Early growth and learning. Choices matter."
+    :"Industry and long-term planning emerge.";
 
   events.innerHTML=state.events.map(e=>`<div class="small">${e}</div>`).join("");
   save();
@@ -239,29 +221,24 @@ function build(type){
     state.pop+=4;
     state.stab-=6;
     state.buildings.push("🏠");
-    log("New families settle the land");
+    log("Families settle the land");
   }
-
   if(type==="workshop"){
     state.prod-=COST.workshop;
     state.buildings.push("⚒️");
-    log("A workshop begins its craft");
+    log("Craftsmanship expands");
   }
-
   if(type==="council"){
     state.prod-=COST.council;
     state.stab+=15;
     state.buildings.push("🏛️");
-    state.foundationsDone=true;
-    log("Order is established. The realm stands strong.",true);
+    log("Order is established");
   }
-
   if(type==="mine"){
     state.prod-=COST.mine;
     state.buildings.push("⛏️");
-    log("Miners extract ore from the earth");
+    log("Miners extract ore");
   }
-
   if(type==="smelter"){
     state.prod-=COST.smelter;
     state.ore-=10;
@@ -279,10 +256,10 @@ btnCouncil.onclick=()=>build("council");
 btnMine.onclick=()=>build("mine");
 btnSmelter.onclick=()=>build("smelter");
 
-btnAdvance.onclick=()=>{
-  if(!canAdvanceEra()) return;
-  state.era="bronze";
-  log("The Age of Bronze begins. New possibilities emerge.",true);
+btnClear.onclick=()=>{
+  if(state.buildings.length<=1) return;
+  const removed=state.buildings.pop();
+  log(`A ${removed} is dismantled`);
   update();
 };
 
