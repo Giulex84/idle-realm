@@ -5,211 +5,240 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Idle Realm</title>
 
-<script src="https://sdk.minepi.com/pi-sdk.js"></script>
-<script>Pi.init({ version: "2.0" });</script>
-
 <style>
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-  background: radial-gradient(circle at top, #0b132b, #020617);
-  color: #e5e7eb;
+:root{
+  --bg:#0b1220;
+  --card:#111a2e;
+  --accent:#2f6df6;
+  --muted:#7d8fb3;
+  --danger:#e5533d;
+  --ok:#3ddc97;
 }
-.container {
-  padding: 16px;
-  max-width: 520px;
-  margin: auto;
+*{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto}
+body{
+  margin:0;
+  background:radial-gradient(circle at top,#162347,#070b16);
+  color:#e9eeff;
 }
-h1 { font-size: 28px; margin: 12px 0 4px; }
-.subtitle { color: #9ca3af; margin-bottom: 16px; }
+header{
+  padding:10px 14px;
+  background:#070b16cc;
+  backdrop-filter:blur(8px);
+  display:flex;
+  justify-content:space-between;
+  font-size:14px;
+}
+header span{display:flex;gap:6px;align-items:center}
+main{padding:14px;display:flex;flex-direction:column;gap:16px}
+h1{margin:6px 0 0;font-size:32px}
+.subtitle{color:var(--muted)}
 
-.card {
-  background: rgba(255,255,255,0.04);
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+.card{
+  background:var(--card);
+  border-radius:16px;
+  padding:14px;
+  box-shadow:0 20px 40px #0006;
 }
+.card h2{margin-top:0}
 
-.stats {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-  opacity: 0.9;
-  margin-bottom: 8px;
+button{
+  border:none;
+  border-radius:12px;
+  padding:14px;
+  font-size:16px;
+  background:var(--accent);
+  color:white;
 }
-
-button {
-  width: 100%;
-  padding: 14px;
-  margin-top: 8px;
-  font-size: 16px;
-  border: none;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: white;
-  font-weight: 600;
-}
-button:disabled {
-  opacity: 0.4;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-.tile {
-  background: rgba(255,255,255,0.08);
-  border-radius: 12px;
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
+button:disabled{
+  background:#23335e;
+  color:#8899c2;
 }
 
-.log {
-  font-size: 13px;
-  color: #d1d5db;
+.build-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
 }
+
+.city-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+.tile{
+  background:#1a2542;
+  border-radius:12px;
+  height:70px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:26px;
+}
+.tile.empty{opacity:.4}
+.tile span{font-size:24px}
+
+.small{color:var(--muted);font-size:14px}
+.events{max-height:200px;overflow:auto}
+.events li{margin-bottom:6px}
 </style>
 </head>
 
 <body>
-<div class="container">
 
-<div class="stats">
-  <div>👥 <span id="pop"></span></div>
-  <div>⚒️ <span id="prod"></span></div>
-  <div>🛡️ <span id="stab"></span>%</div>
-  <div>⏳ <span id="time"></span></div>
-</div>
+<header>
+  <span>👥 <b id="pop">10</b></span>
+  <span>🛠 <b id="prod">0</b></span>
+  <span>🛡 <b id="stab">100</b>%</span>
+  <span>⏳ <b id="time">0</b></span>
+</header>
 
-<h1>Idle Realm</h1>
-<div class="subtitle">A living world shaped by time and choices</div>
+<main>
+  <h1>Idle Realm</h1>
+  <div class="subtitle">A living world shaped by time and choices</div>
 
-<div class="card">
-  <strong>Build</strong>
-
-  <button id="buildSettlement">🏠 Build Settlement</button>
-  <button id="buildWorkshop">⚒️ Build Workshop</button>
-  <button id="buildCouncil">🏛️ Build Council</button>
-
-  <div style="font-size:13px;opacity:.7;margin-top:8px">
-    Settlement cost: 15 prod<br/>
-    Workshop cost: 15 prod
+  <div class="card">
+    <h2>Build</h2>
+    <div class="build-grid">
+      <button id="btnSettlement">🏠 Settlement</button>
+      <button id="btnWorkshop">🛠 Workshop</button>
+      <button id="btnCouncil">🏛 Council</button>
+    </div>
+    <div class="small" id="costs"></div>
   </div>
-</div>
 
-<div class="card">
-  <strong>City</strong>
-  <div class="grid" id="cityGrid"></div>
-</div>
+  <div class="card">
+    <h2>City</h2>
+    <div class="city-grid" id="city"></div>
+  </div>
 
-<div class="card">
-  <strong>Era</strong><br/>
-  Foundations — slow growth. Every choice matters.
-</div>
+  <div class="card">
+    <h2>Era</h2>
+    <div class="small"><b>Foundations</b> — slow growth. Every choice matters.</div>
+  </div>
 
-<div class="card">
-  <strong>Events</strong>
-  <div class="log" id="log"></div>
-</div>
-
-</div>
+  <div class="card">
+    <h2>Events</h2>
+    <ul class="events" id="events"></ul>
+  </div>
+</main>
 
 <script>
-/* ===== GAME STATE ===== */
-const state = {
-  population: 10,
-  production: 0,
-  stability: 100,
-  time: 0,
-
-  settlements: 0,
-  workshops: 0,
-  councils: 0
-};
-
-/* ===== DOM ===== */
-const popEl = document.getElementById("pop");
-const prodEl = document.getElementById("prod");
-const stabEl = document.getElementById("stab");
-const timeEl = document.getElementById("time");
-const logEl = document.getElementById("log");
-const gridEl = document.getElementById("cityGrid");
-
-/* ===== INIT GRID ===== */
-for (let i = 0; i < 9; i++) {
-  const t = document.createElement("div");
-  t.className = "tile";
-  gridEl.appendChild(t);
+/* ===== STATE ===== */
+const state={
+  pop:10,
+  prod:0,
+  stab:100,
+  time:0,
+  govLevel:0, // 0 Clan, 1 Council
+  tiles:Array(9).fill(null),
+  counts:{settlement:0,workshop:0,council:0}
 }
 
-/* ===== HELPERS ===== */
-function log(msg) {
-  logEl.innerHTML = "• " + msg + "<br/>" + logEl.innerHTML;
+/* ===== COSTS ===== */
+const cost={
+  settlement:15,
+  workshop:15,
+  council:0
 }
 
-function render() {
-  popEl.textContent = state.population.toFixed(1);
-  prodEl.textContent = state.production.toFixed(1);
-  stabEl.textContent = Math.max(0, state.stability).toFixed(0);
-  timeEl.textContent = state.time;
+/* ===== UI ===== */
+const $=id=>document.getElementById(id)
+const log=txt=>{
+  const li=document.createElement("li")
+  li.textContent=txt
+  $("events").prepend(li)
 }
 
-/* ===== CORE LOOP (ANTI-DEADLOCK) ===== */
-setInterval(() => {
-  state.time++;
+/* ===== UPDATE ===== */
+function update(){
+  $("pop").textContent=state.pop.toFixed(1)
+  $("prod").textContent=state.prod.toFixed(1)
+  $("stab").textContent=Math.max(0,Math.min(100,state.stab)).toFixed(0)
+  $("time").textContent=state.time
 
-  // 🔑 BASE PASSIVE PRODUCTION (ANTI DEADLOCK)
-  state.production += state.population * 0.02;
+  $("costs").innerHTML=
+    `Settlement cost: ${cost.settlement} prod<br>
+     Workshop cost: ${cost.workshop} prod`
 
-  render();
-}, 1000);
+  $("btnSettlement").disabled=state.prod<cost.settlement
+  $("btnWorkshop").disabled=state.prod<cost.workshop
+  $("btnCouncil").disabled=state.counts.council>=1
 
-/* ===== ACTIONS ===== */
-document.getElementById("buildSettlement").onclick = () => {
-  if (state.production < 15) return log("Not enough production");
-  state.production -= 15;
-  state.population += 4;
-  state.stability -= 8;
-  state.settlements++;
-  place("🏠");
-  log("Settlement built (+4 pop, -8 stab)");
-};
+  renderCity()
+}
 
-document.getElementById("buildWorkshop").onclick = () => {
-  if (state.workshops === 0) {
-    // 🔑 FIRST WORKSHOP ALWAYS ALLOWED
-    state.workshops++;
-    place("⚒️");
-    log("First Workshop built (unlocked industry)");
-    return;
+/* ===== CITY ===== */
+function renderCity(){
+  $("city").innerHTML=""
+  state.tiles.forEach(t=>{
+    const d=document.createElement("div")
+    d.className="tile"+(t?"":" empty")
+    d.innerHTML=t?icons[t]:"⬜"
+    $("city").appendChild(d)
+  })
+}
+
+/* ===== BUILD ===== */
+const icons={settlement:"🏠",workshop:"🛠",council:"🏛"}
+
+function place(type){
+  const i=state.tiles.indexOf(null)
+  if(i===-1){log("No empty tiles");return false}
+  state.tiles[i]=type
+  state.counts[type]++
+  return true
+}
+
+$("btnSettlement").onclick=()=>{
+  if(state.prod<cost.settlement)return
+  state.prod-=cost.settlement
+  if(place("settlement")){
+    state.pop+=4
+    state.stab-=8
+    log("Settlement built (+4 pop, -8 stability)")
   }
-  if (state.production < 15) return log("Not enough production");
-  state.production -= 15;
-  state.workshops++;
-  place("⚒️");
-  log("Workshop built");
-};
-
-document.getElementById("buildCouncil").onclick = () => {
-  if (state.councils >= 1) return log("Only one Council allowed");
-  state.councils++;
-  state.stability += 20;
-  place("🏛️");
-  log("Council built (+20 stability)");
-};
-
-function place(icon) {
-  const tiles = [...document.querySelectorAll(".tile")];
-  const empty = tiles.find(t => t.textContent === "");
-  if (empty) empty.textContent = icon;
+  update()
 }
 
-render();
+$("btnWorkshop").onclick=()=>{
+  if(state.prod<cost.workshop)return
+  state.prod-=cost.workshop
+  if(place("workshop")){
+    log("Workshop built (+2 production)")
+  }
+  update()
+}
+
+$("btnCouncil").onclick=()=>{
+  if(state.counts.council>=1){
+    log("Only one Council allowed")
+    return
+  }
+  place("council")
+  state.govLevel=1
+  state.stab+=20
+  log("Council established (+20 stability)")
+  update()
+}
+
+/* ===== TICK ===== */
+setInterval(()=>{
+  state.time++
+
+  /* BASE PRODUCTION FIX */
+  const baseProd=state.pop*0.05
+  const workshopProd=state.counts.workshop*2
+  state.prod+=baseProd+workshopProd
+
+  /* STABILITY DECAY ONLY IF OVERPOP */
+  if(state.pop>30) state.stab-=0.2
+
+  update()
+},1000)
+
+/* INIT */
+update()
 </script>
+
 </body>
 </html>
