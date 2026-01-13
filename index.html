@@ -97,7 +97,7 @@
 
 <div class="topbar">
   <div>👥 <span id="pop">10</span></div>
-  <div>🛠 <span id="prod">0</span></div>
+  <div>🛠 <span id="prod">30</span></div>
   <div>🛡 <span id="stab">100</span>%</div>
   <div>⏳ <span id="time">0</span></div>
 </div>
@@ -143,7 +143,7 @@
 <script>
 /* ===== GAME STATE ===== */
 let population = 10;
-let production = 0;
+let production = 30; // ⭐ START BOOST
 let stability = 100;
 let time = 0;
 
@@ -206,7 +206,6 @@ function build(type) {
   }
 
   cooldown = COOLDOWN_MAX;
-
   const slot = emptySlotIndex();
   if (slot === -1) return;
 
