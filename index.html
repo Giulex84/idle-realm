@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Idle Realm</title>
 
 <style>
@@ -14,66 +14,38 @@
   --text:#e6ecff;
   --muted:#9aa4c7;
 }
-
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
-
 body{
   margin:0;
   background:linear-gradient(180deg,#0a1020,#050a14);
   color:var(--text);
 }
-
 header{
-  position:sticky;
-  top:0;
-  z-index:10;
+  position:sticky;top:0;z-index:10;
   background:#060b18;
-  display:flex;
-  justify-content:space-between;
-  padding:10px 12px;
-  font-size:14px;
+  display:flex;justify-content:space-between;
+  padding:10px 12px;font-size:14px;
 }
-
 main{padding:16px;max-width:520px;margin:auto}
-
 h1{margin:0 0 4px}
 .small{font-size:13px;color:var(--muted)}
-
 .card{
   background:linear-gradient(180deg,var(--card),var(--card2));
-  border-radius:16px;
-  padding:16px;
-  margin-bottom:16px;
+  border-radius:16px;padding:16px;margin-bottom:16px;
 }
-
 button{
-  width:100%;
-  padding:16px;
-  border-radius:14px;
-  border:none;
-  background:var(--accent);
-  color:white;
-  font-size:16px;
+  width:100%;padding:16px;border-radius:14px;border:none;
+  background:var(--accent);color:white;font-size:16px;
   margin-bottom:10px;
 }
-
 button:disabled{opacity:.45}
-
 .grid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
 }
-
 .tile{
-  background:#0f1730;
-  border-radius:12px;
-  height:72px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:28px;
-  transition:transform .12s ease;
+  background:#0f1730;border-radius:12px;height:72px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;transition:transform .12s ease;
 }
 </style>
 </head>
@@ -84,6 +56,8 @@ button:disabled{opacity:.45}
   <span>👥 <b id="pop"></b></span>
   <span>⚒️ <b id="prod"></b></span>
   <span>🛡️ <b id="stab"></b>%</span>
+  <span>🪨 <b id="ore"></b></span>
+  <span>🥉 <b id="bronze"></b></span>
   <span>⏳ <b id="time"></b></span>
 </header>
 
@@ -94,9 +68,14 @@ button:disabled{opacity:.45}
 
 <div class="card">
   <h2>Build</h2>
+
   <button id="btnSettle">🏠 Settle New Families</button>
   <button id="btnWork">⚒️ Expand Craftsmanship</button>
   <button id="btnCouncil">🏛️ Form the Council</button>
+
+  <button id="btnMine" style="display:none">⛏️ Build Mine</button>
+  <button id="btnSmelter" style="display:none">🔥 Build Smelter</button>
+
   <div class="small" id="info"></div>
 </div>
 
@@ -127,114 +106,111 @@ button:disabled{opacity:.45}
 </main>
 
 <script>
-/* ==== FOUNDATIONS BASELINE — DO NOT REBALANCE ==== */
-
-const MAX_SLOTS = 9;
+/* ==== BASELINE ==== */
+const BASE_SLOTS = 9;
 const COOLDOWN = 8;
 
 const COST = {
-  settlement: 15,
-  workshop: 20,
-  council: 30
+  settlement:15,
+  workshop:20,
+  council:30,
+  mine:40,
+  smelter:60
 };
 
 const DEFAULT = {
-  era: "foundations",
-  pop: 12,
-  prod: 30,
-  stab: 100,
-  time: 0,
-  lastAction: 0,
-  buildings: ["⚒️"],
-  events: ["Realm founded with basic craftsmanship"],
-  phase: 0,
-  foundationsDone: false
+  era:"foundations",
+  pop:12,
+  prod:30,
+  stab:100,
+  time:0,
+  lastAction:0,
+  buildings:["⚒️"],
+  events:["Realm founded with basic craftsmanship"],
+  phase:0,
+  foundationsDone:false,
+  ore:0,
+  bronze:0,
+  lastSeen:Date.now()
 };
 
 function loadState(){
   let s;
-  try{
-    s = JSON.parse(localStorage.getItem("idleRealm"));
-  }catch{
-    return structuredClone(DEFAULT);
-  }
-  if(!s || typeof s!=="object") return structuredClone(DEFAULT);
-  for(const k in DEFAULT){
-    if(typeof s[k] !== typeof DEFAULT[k]) s[k]=DEFAULT[k];
-  }
+  try{s=JSON.parse(localStorage.getItem("idleRealm"));}
+  catch{return structuredClone(DEFAULT);}
+  if(!s||typeof s!=="object") return structuredClone(DEFAULT);
+  for(const k in DEFAULT)
+    if(typeof s[k]!==typeof DEFAULT[k]) s[k]=DEFAULT[k];
   if(!Array.isArray(s.buildings)) s.buildings=["⚒️"];
   if(!Array.isArray(s.events)) s.events=[];
-  if(typeof s.lastAction!=="number" || isNaN(s.lastAction)) s.lastAction=0;
+  if(typeof s.lastAction!=="number") s.lastAction=0;
   return s;
 }
 
-let state = loadState();
+let state=loadState();
 
 function save(){
+  state.lastSeen=Date.now();
   localStorage.setItem("idleRealm",JSON.stringify(state));
 }
 
 function log(msg,important=false){
   state.events.unshift((important?"★ ":"• ")+msg);
-  state.events = state.events.slice(0,6);
+  state.events=state.events.slice(0,6);
 }
 
 function canAct(){
-  if(!state.lastAction || isNaN(state.lastAction)) return true;
-  return Date.now() - state.lastAction >= COOLDOWN*1000;
+  if(!state.lastAction||isNaN(state.lastAction)) return true;
+  return Date.now()-state.lastAction>=COOLDOWN*1000;
+}
+
+function maxSlots(){
+  return state.era==="bronze"?12:BASE_SLOTS;
 }
 
 function canAdvanceEra(){
   return state.era==="foundations"
     && state.buildings.includes("🏛️")
-    && state.buildings.length>=MAX_SLOTS;
+    && state.buildings.length>=BASE_SLOTS;
 }
 
-function checkFoundationsProgress(){
-  if(state.era!=="foundations") return;
-
-  if(state.phase===0 && state.buildings.length>=2){
-    state.phase=1;
-    log("Craftsmanship spreads across the land");
-  }
-  if(state.phase===1 && state.pop>=20){
-    state.phase=2;
-    log("Families gather around a growing settlement");
-  }
-  if(state.phase===2 && state.buildings.includes("🏛️")){
-    state.phase=3;
-    state.foundationsDone=true;
-    log("Order is established. The realm stands strong.",true);
+function offlineProgress(){
+  const diff=Math.floor((Date.now()-state.lastSeen)/1000);
+  if(diff<=0) return;
+  if(state.era==="bronze"){
+    const mines=state.buildings.filter(b=>b==="⛏️").length;
+    state.ore+=Math.min(mines*diff, mines*3600);
+    log(`You gained ${mines*diff} ore while away`);
   }
 }
+
+offlineProgress();
 
 function update(){
-  pop.innerText = state.pop.toFixed(1);
-  prod.innerText = state.prod.toFixed(0);
-  stab.innerText = Math.max(0,Math.min(100,state.stab)).toFixed(0);
-  time.innerText = state.time;
+  pop.innerText=state.pop.toFixed(1);
+  prod.innerText=state.prod.toFixed(0);
+  stab.innerText=Math.max(0,Math.min(100,state.stab)).toFixed(0);
+  ore.innerText=state.ore.toFixed(0);
+  bronze.innerText=state.bronze.toFixed(0);
+  time.innerText=state.time;
 
-  const cd = Math.max(0,
-    Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000)
-  );
+  const cd=Math.max(0,Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000));
+  info.innerText=canAct()?"Choose how your realm grows":`Your people are busy… ${cd}s`;
 
-  info.innerText = canAct()
-    ? "Choose how your realm grows"
-    : `Your people are busy… ${cd}s`;
+  btnSettle.disabled=!canAct()||state.prod<COST.settlement||state.buildings.length>=maxSlots();
+  btnWork.disabled=!canAct()||state.prod<COST.workshop||state.buildings.length>=maxSlots();
+  btnCouncil.disabled=!canAct()||state.prod<COST.council||state.buildings.includes("🏛️");
 
-  btnSettle.disabled =
-    !canAct() || state.prod < COST.settlement || state.buildings.length>=MAX_SLOTS;
+  btnMine.style.display=state.era==="bronze"?"block":"none";
+  btnSmelter.style.display=state.era==="bronze"?"block":"none";
 
-  btnWork.disabled =
-    !canAct() || state.prod < COST.workshop || state.buildings.length>=MAX_SLOTS;
+  btnMine.disabled=!canAct()||state.prod<COST.mine||state.buildings.length>=maxSlots();
+  btnSmelter.disabled=!canAct()||state.prod<COST.smelter||state.ore<10||state.buildings.length>=maxSlots();
 
-  btnCouncil.disabled =
-    !canAct() || state.prod < COST.council || state.buildings.includes("🏛️");
-
-  advanceCard.style.display = canAdvanceEra() ? "block" : "none";
+  advanceCard.style.display=canAdvanceEra()?"block":"none";
 
   city.innerHTML="";
-  for(let i=0;i<MAX_SLOTS;i++){
+  for(let i=0;i<maxSlots();i++){
     const t=document.createElement("div");
     t.className="tile";
     t.innerText=state.buildings[i]||"";
@@ -243,15 +219,15 @@ function update(){
 
   if(state.era==="foundations"){
     eraTitle.innerText="Foundations";
-    eraDesc.innerText = state.foundationsDone
-      ? "The realm is stable and ready to grow beyond survival."
-      : "Fast growth to understand the basics of the realm.";
+    eraDesc.innerText=state.foundationsDone
+      ?"The realm stands strong. A new age awaits."
+      :"Fast growth to understand the basics.";
   }else{
     eraTitle.innerText="Age of Bronze";
-    eraDesc.innerText="A new age dawns. Resources and ambition expand.";
+    eraDesc.innerText="Resources, industry and long-term planning emerge.";
   }
 
-  events.innerHTML = state.events.map(e=>`<div class="small">${e}</div>`).join("");
+  events.innerHTML=state.events.map(e=>`<div class="small">${e}</div>`).join("");
   save();
 }
 
@@ -276,18 +252,34 @@ function build(type){
     state.prod-=COST.council;
     state.stab+=15;
     state.buildings.push("🏛️");
-    log("The people demand order. A council is formed.",true);
+    state.foundationsDone=true;
+    log("Order is established. The realm stands strong.",true);
   }
 
-  state.lastAction = Date.now();
+  if(type==="mine"){
+    state.prod-=COST.mine;
+    state.buildings.push("⛏️");
+    log("Miners extract ore from the earth");
+  }
+
+  if(type==="smelter"){
+    state.prod-=COST.smelter;
+    state.ore-=10;
+    state.buildings.push("🔥");
+    log("Ore is refined into bronze");
+  }
+
+  state.lastAction=Date.now();
   update();
 }
 
-btnSettle.onclick = ()=>build("settlement");
-btnWork.onclick = ()=>build("workshop");
-btnCouncil.onclick = ()=>build("council");
+btnSettle.onclick=()=>build("settlement");
+btnWork.onclick=()=>build("workshop");
+btnCouncil.onclick=()=>build("council");
+btnMine.onclick=()=>build("mine");
+btnSmelter.onclick=()=>build("smelter");
 
-btnAdvance.onclick = ()=>{
+btnAdvance.onclick=()=>{
   if(!canAdvanceEra()) return;
   state.era="bronze";
   log("The Age of Bronze begins. New possibilities emerge.",true);
@@ -296,10 +288,11 @@ btnAdvance.onclick = ()=>{
 
 setInterval(()=>{
   state.time++;
-  const workshops = state.buildings.filter(b=>b==="⚒️").length;
-  state.prod += workshops*0.8;
+  const workshops=state.buildings.filter(b=>b==="⚒️").length;
+  const mines=state.buildings.filter(b=>b==="⛏️").length;
+  state.prod+=workshops*0.8;
+  state.ore+=mines*0.3;
   if(state.stab<100) state.stab+=0.1;
-  checkFoundationsProgress();
   update();
 },1000);
 
