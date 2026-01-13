@@ -72,9 +72,7 @@ button{
   color:white;
 }
 
-button:disabled{
-  opacity:.35;
-}
+button:disabled{opacity:.35}
 
 .decisions button{
   margin-bottom:8px;
@@ -94,9 +92,7 @@ button:disabled{
   color:var(--muted);
 }
 
-.decisions button:hover .tooltip{
-  display:block;
-}
+.decisions button:hover .tooltip{display:block}
 
 .slots{
   display:grid;
@@ -122,9 +118,7 @@ button:disabled{
   color:var(--muted);
 }
 
-.reset{
-  background:var(--danger);
-}
+.reset{background:var(--danger)}
 
 .small{
   font-size:12px;
@@ -171,6 +165,25 @@ button:disabled{
 </main>
 
 <script>
+/* =======================
+   DOM BINDINGS (FIX)
+======================= */
+const pop = document.getElementById("pop");
+const tools = document.getElementById("tools");
+const ore = document.getElementById("ore");
+const bronze = document.getElementById("bronze");
+const stab = document.getElementById("stab");
+
+const eraName = document.getElementById("eraName");
+const objectivesDiv = document.getElementById("objectives");
+const advanceBtn = document.getElementById("advanceBtn");
+const decisions = document.getElementById("decisions");
+const slots = document.getElementById("slots");
+const log = document.getElementById("log");
+
+/* =======================
+   GAME STATE
+======================= */
 let state = {
   era:1,
   pop:1,
@@ -186,6 +199,9 @@ let state = {
   log:[]
 };
 
+/* =======================
+   HELPERS
+======================= */
 function canAct(){
   return Date.now()-state.lastAction>=state.cooldown;
 }
@@ -207,10 +223,12 @@ function updateHeader(){
   stab.textContent=state.stability+"%";
 }
 
+/* =======================
+   OBJECTIVES
+======================= */
 function objectives(){
-  let o=[];
   if(state.era===1){
-    o=[
+    return [
       ["Population ≥ 6",state.pop>=6],
       ["Tools ≥ 40",state.tools>=40],
       ["Council established",state.council>=1],
@@ -218,21 +236,25 @@ function objectives(){
     ];
   }
   if(state.era===2){
-    o=[
+    return [
       ["Build Mine",state.city.includes("⛏")],
       ["Build Smelter",state.city.includes("🔥")],
       ["Produce 50 Bronze",state.bronze>=50],
       ["Stability ≥ 80%",state.stability>=80]
     ];
   }
-  return o;
+  return [];
 }
 
+/* =======================
+   RENDER
+======================= */
 function render(){
   updateHeader();
+
   eraName.textContent =
-    state.era===1?"Tribal Age":
-    state.era===2?"Bronze Age":
+    state.era===1 ? "Tribal Age" :
+    state.era===2 ? "Bronze Age" :
     "Iron Age (Locked)";
 
   objectivesDiv.innerHTML="";
@@ -243,11 +265,12 @@ function render(){
     objectivesDiv.appendChild(d);
   });
 
-  let ready=objectives().every(o=>o[1]);
-  advanceBtn.disabled=!ready;
-  advanceBtn.onclick=()=>{ if(ready) advanceEra(); };
+  const ready = objectives().every(o=>o[1]);
+  advanceBtn.disabled = !ready;
+  advanceBtn.onclick = () => { if(ready) advanceEra(); };
 
   decisions.innerHTML="";
+
   if(state.era===1){
     addDecision("🏠 Settle Families",()=>{
       state.pop+=1;
@@ -307,6 +330,9 @@ function render(){
   });
 }
 
+/* =======================
+   UI HELPERS
+======================= */
 function addDecision(label,fn,enabled,tip){
   let b=document.createElement("button");
   b.textContent=label;
@@ -319,6 +345,9 @@ function addDecision(label,fn,enabled,tip){
   decisions.appendChild(b);
 }
 
+/* =======================
+   ERA ADVANCE
+======================= */
 function advanceEra(){
   if(state.era===1){
     state.era=2;
@@ -329,6 +358,9 @@ function advanceEra(){
   render();
 }
 
+/* =======================
+   PASSIVE LOOP
+======================= */
 setInterval(()=>{
   if(state.era>=2){
     if(state.city.includes("⛏")) state.ore++;
@@ -341,6 +373,9 @@ setInterval(()=>{
   render();
 },8000);
 
+/* =======================
+   RESET
+======================= */
 function resetGame(){
   localStorage.clear();
   location.reload();
