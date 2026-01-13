@@ -6,65 +6,51 @@
 <title>Idle Realm</title>
 
 <style>
-  body {
-    margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    background: radial-gradient(circle at top, #0b1a33, #050914);
-    color: #e8eefc;
-  }
-
-  header {
-    padding: 14px;
-    display: flex;
-    justify-content: space-around;
-    background: rgba(0,0,0,0.4);
-    backdrop-filter: blur(6px);
-    font-weight: bold;
-  }
-
-  main {
-    padding: 20px;
-  }
-
-  h1 {
-    margin-top: 10px;
-  }
-
-  .card {
-    background: rgba(255,255,255,0.05);
-    border-radius: 16px;
-    padding: 16px;
-    margin-bottom: 20px;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
-  }
-
-  .buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  button {
-    flex: 1;
-    min-width: 140px;
-    padding: 14px;
-    border-radius: 12px;
-    border: none;
-    font-size: 15px;
-    font-weight: 600;
-    background: #2563eb;
-    color: white;
-  }
-
-  button:disabled {
-    background: #334155;
-    opacity: 0.6;
-  }
-
-  ul {
-    padding-left: 20px;
-    font-size: 14px;
-  }
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+  background:radial-gradient(circle at top,#0b1a33,#050914);
+  color:#e8eefc;
+}
+header{
+  display:flex;
+  justify-content:space-around;
+  padding:12px;
+  background:rgba(0,0,0,.45);
+  backdrop-filter:blur(6px);
+  font-weight:600;
+}
+main{padding:16px;}
+h1{margin:10px 0 4px;}
+.card{
+  background:rgba(255,255,255,.05);
+  border-radius:16px;
+  padding:14px;
+  margin-bottom:16px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+}
+.buttons{display:flex;flex-wrap:wrap;gap:10px;}
+button{
+  flex:1;
+  min-width:140px;
+  padding:14px;
+  border-radius:12px;
+  border:none;
+  font-size:15px;
+  font-weight:600;
+  background:#2563eb;
+  color:#fff;
+}
+button.locked{
+  background:#334155;
+}
+small{opacity:.7}
+.city{
+  font-family:monospace;
+  font-size:18px;
+  letter-spacing:2px;
+}
+.log{font-size:14px;padding-left:18px;}
 </style>
 </head>
 
@@ -74,161 +60,133 @@
   <div>👥 <span id="pop">0</span></div>
   <div>⚒️ <span id="prod">0</span></div>
   <div>🛡️ <span id="stab">0</span>%</div>
-  <div>⏳ <span id="eraName">Foundations</span></div>
+  <div>⏳ <span id="era">Foundations</span></div>
 </header>
 
 <main>
-
 <h1>Idle Realm</h1>
+<small>A living world shaped by time and choices</small>
 
 <div class="card">
-  <h2>Build</h2>
-  <div class="buttons">
-    <button id="settlementBtn">🏠 Settlement</button>
-    <button id="workshopBtn">⚒️ Workshop</button>
-    <button id="councilBtn">🏛️ Council</button>
-  </div>
+<h2>Build</h2>
+<div class="buttons">
+  <button id="settlementBtn">🏠 Settlement</button>
+  <button id="workshopBtn">⚒️ Workshop</button>
+  <button id="councilBtn">🏛️ Council</button>
+</div>
+<p id="hint"><small></small></p>
 </div>
 
 <div class="card">
-  <h2>Era Progress</h2>
-  <p id="eraDesc"></p>
+<h2>City</h2>
+<div class="city">
+Residential: <span id="res"></span><br/>
+Industrial: <span id="ind"></span><br/>
+Government: <span id="gov"></span>
+</div>
 </div>
 
 <div class="card">
-  <h2>Events</h2>
-  <ul id="log"></ul>
+<h2>Era</h2>
+<p id="eraDesc"></p>
+</div>
+
+<div class="card">
+<h2>Events</h2>
+<ul id="log" class="log"></ul>
 </div>
 
 </main>
 
 <script>
-/* =======================
-   STATE
-======================= */
-let state = JSON.parse(localStorage.getItem("idleRealm")) || {
-  population: 10,
-  production: 10,
-  stability: 100,
-  settlements: 0,
-  workshops: 0,
-  councils: 0,
-  era: 0,
-  tick: 0
+/* ================= STATE ================= */
+let S = JSON.parse(localStorage.getItem("idleRealm")) || {
+  pop:10, prod:10, stab:100,
+  s:0, w:0, c:0,
+  era:0, tick:0
 };
 
-const ERAS = [
-  {
-    name: "Foundations",
-    desc: "Basic growth. Limited expansion.",
-    popCap: 100,
-    settlementCap: 5,
-    workshopCap: 3
-  },
-  {
-    name: "Expansion",
-    desc: "Faster growth. Higher limits.",
-    popCap: 500,
-    settlementCap: 20,
-    workshopCap: 15
-  }
+const ERAS=[
+  {name:"Foundations",desc:"Slow growth. Every choice matters.",popCap:120},
+  {name:"Expansion",desc:"Growth accelerates. Stability becomes critical.",popCap:600}
 ];
 
-/* =======================
-   HELPERS
-======================= */
-function log(msg) {
-  const li = document.createElement("li");
-  li.textContent = msg;
-  document.getElementById("log").prepend(li);
-}
-
-function save() {
-  localStorage.setItem("idleRealm", JSON.stringify(state));
-}
-
-function canBuild(cost, stabCost) {
-  return state.production >= cost && state.stability > stabCost;
-}
-
-/* =======================
-   BUILD ACTIONS
-======================= */
-document.getElementById("settlementBtn").onclick = () => {
-  if (!canBuild(10, 10)) return;
-  if (state.settlements >= ERAS[state.era].settlementCap) return;
-
-  state.production -= 10;
-  state.population += 5;
-  state.stability -= 10;
-  state.settlements++;
-  log("Built Settlement (+5 pop, -10 stab)");
+/* ================= HELPERS ================= */
+const $=id=>document.getElementById(id);
+const log=msg=>{
+  const li=document.createElement("li");
+  li.textContent=msg;
+  $("log").prepend(li);
 };
+const save=()=>localStorage.setItem("idleRealm",JSON.stringify(S));
 
-document.getElementById("workshopBtn").onclick = () => {
-  if (!canBuild(15, 15)) return;
-  if (state.workshops >= ERAS[state.era].workshopCap) return;
+function cost(base, count){ return Math.floor(base*(1+count*0.35)); }
 
-  state.production -= 15;
-  state.production += 3;
-  state.stability -= 15;
-  state.workshops++;
-  log("Built Workshop (+3 prod, -15 stab)");
-};
-
-document.getElementById("councilBtn").onclick = () => {
-  if (!canBuild(20, 0)) return;
-  if (state.councils >= 1) return;
-
-  state.production -= 20;
-  state.stability += 20;
-  state.councils++;
-  log("Built Council (+20 stab)");
-};
-
-/* =======================
-   GAME LOOP
-======================= */
-setInterval(() => {
-  state.tick++;
-  state.production += state.workshops * 0.5;
-  state.stability = Math.min(100, state.stability + 0.1);
-
-  // ERA CHECK
-  if (
-    state.era === 0 &&
-    state.population >= 80 &&
-    state.settlements >= 3
-  ) {
-    state.era = 1;
-    log("Era advanced to Expansion");
+/* ================= ACTIONS ================= */
+function build(type){
+  if(type==="s"){
+    const pCost=cost(8,S.s), stabCost=8;
+    if(S.prod<pCost) return log("Not enough production");
+    if(S.stab<stabCost) return log("Stability too low");
+    S.prod-=pCost; S.pop+=4; S.stab-=stabCost; S.s++;
+    log(`Settlement built (+4 pop, -${stabCost} stab)`);
   }
-
-  updateUI();
-  save();
-}, 1000);
-
-/* =======================
-   UI
-======================= */
-function updateUI() {
-  document.getElementById("pop").textContent = state.population.toFixed(1);
-  document.getElementById("prod").textContent = state.production.toFixed(1);
-  document.getElementById("stab").textContent = state.stability.toFixed(0);
-  document.getElementById("eraName").textContent = ERAS[state.era].name;
-  document.getElementById("eraDesc").textContent = ERAS[state.era].desc;
-
-  document.getElementById("settlementBtn").disabled =
-    !canBuild(10,10) || state.settlements >= ERAS[state.era].settlementCap;
-
-  document.getElementById("workshopBtn").disabled =
-    !canBuild(15,15) || state.workshops >= ERAS[state.era].workshopCap;
-
-  document.getElementById("councilBtn").disabled =
-    !canBuild(20,0) || state.councils >= 1;
+  if(type==="w"){
+    const pCost=cost(12,S.w), stabCost=12;
+    if(S.prod<pCost) return log("Not enough production");
+    if(S.stab<stabCost) return log("Stability too low");
+    S.prod-=pCost; S.prod+=2; S.stab-=stabCost; S.w++;
+    log(`Workshop built (+2 prod, -${stabCost} stab)`);
+  }
+  if(type==="c"){
+    const pCost=25;
+    if(S.c>=1) return log("Only one Council allowed");
+    if(S.prod<pCost) return log("Not enough production");
+    S.prod-=pCost; S.stab+=20; S.c=1;
+    log("Council built (+20 stability)");
+  }
 }
 
-updateUI();
+/* ================= UI ================= */
+function update(){
+  $("pop").textContent=S.pop.toFixed(1);
+  $("prod").textContent=S.prod.toFixed(1);
+  $("stab").textContent=S.stab.toFixed(0);
+  $("era").textContent=ERAS[S.era].name;
+  $("eraDesc").textContent=ERAS[S.era].desc;
+
+  $("res").textContent="■".repeat(S.s);
+  $("ind").textContent="■".repeat(S.w);
+  $("gov").textContent=S.c?"■":"";
+
+  // hints
+  $("hint").innerHTML=
+    `Settlement cost: ${cost(8,S.s)} prod<br/>
+     Workshop cost: ${cost(12,S.w)} prod`;
+
+  save();
+}
+
+/* ================= LOOP ================= */
+setInterval(()=>{
+  S.tick++;
+  S.prod+=S.w*0.4;
+  S.pop=Math.min(S.pop+S.s*0.2,ERAS[S.era].popCap);
+  S.stab=Math.min(100,S.stab+0.15);
+
+  if(S.era===0 && S.pop>80 && S.s>=3){
+    S.era=1;
+    log("⚡ Era advanced: Expansion");
+  }
+  update();
+},1000);
+
+/* ================= BINDINGS ================= */
+$("settlementBtn").onclick=()=>build("s");
+$("workshopBtn").onclick=()=>build("w");
+$("councilBtn").onclick=()=>build("c");
+
+update();
 </script>
 
 </body>
