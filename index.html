@@ -7,60 +7,65 @@
 
 <style>
 :root{
-  --bg:#0b1220;
-  --card:#111a2e;
-  --accent:#2f6df6;
-  --muted:#7d8fb3;
-  --danger:#e5533d;
-  --ok:#3ddc97;
+  --bg:#070b16;
+  --panel:#101a30;
+  --accent:#3b82f6;
+  --muted:#94a3b8;
+  --danger:#ef4444;
 }
-*{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto}
+*{box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif}
 body{
   margin:0;
-  background:radial-gradient(circle at top,#162347,#070b16);
-  color:#e9eeff;
+  background:radial-gradient(circle at top,#162347,var(--bg));
+  color:#e5e7eb;
 }
 header{
   padding:10px 14px;
-  background:#070b16cc;
+  background:#050914cc;
   backdrop-filter:blur(8px);
   display:flex;
   justify-content:space-between;
   font-size:14px;
 }
 header span{display:flex;gap:6px;align-items:center}
-main{padding:14px;display:flex;flex-direction:column;gap:16px}
-h1{margin:6px 0 0;font-size:32px}
+main{
+  padding:14px;
+  max-width:420px;
+  margin:auto;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+h1{margin:6px 0 0;font-size:30px}
 .subtitle{color:var(--muted)}
-
 .card{
-  background:var(--card);
+  background:var(--panel);
   border-radius:16px;
   padding:14px;
   box-shadow:0 20px 40px #0006;
 }
 .card h2{margin-top:0}
 
-button{
-  border:none;
-  border-radius:12px;
-  padding:14px;
-  font-size:16px;
-  background:var(--accent);
-  color:white;
-}
-button:disabled{
-  background:#23335e;
-  color:#8899c2;
-}
-
-.build-grid{
+.build{
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:12px;
 }
+button{
+  border:none;
+  border-radius:12px;
+  padding:14px;
+  font-size:15px;
+  font-weight:600;
+  background:var(--accent);
+  color:white;
+}
+button:disabled{
+  background:#24345f;
+  color:var(--muted);
+}
 
-.city-grid{
+.city{
   display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:10px;
@@ -74,21 +79,22 @@ button:disabled{
   justify-content:center;
   font-size:26px;
 }
-.tile.empty{opacity:.4}
-.tile span{font-size:24px}
+.tile.empty{opacity:.35}
 
-.small{color:var(--muted);font-size:14px}
-.events{max-height:200px;overflow:auto}
+.small{font-size:13px;color:var(--muted)}
+.events{max-height:160px;overflow:auto;font-size:13px}
 .events li{margin-bottom:6px}
+.cooldown{color:#facc15}
+.locked{color:#64748b}
 </style>
 </head>
 
 <body>
 
 <header>
-  <span>👥 <b id="pop">10</b></span>
-  <span>🛠 <b id="prod">0</b></span>
-  <span>🛡 <b id="stab">100</b>%</span>
+  <span>👥 <b id="pop">0</b></span>
+  <span>⚒️ <b id="prod">0</b></span>
+  <span>🛡️ <b id="stab">0</b>%</span>
   <span>⏳ <b id="time">0</b></span>
 </header>
 
@@ -98,22 +104,26 @@ button:disabled{
 
   <div class="card">
     <h2>Build</h2>
-    <div class="build-grid">
+    <div class="build">
       <button id="btnSettlement">🏠 Settlement</button>
-      <button id="btnWorkshop">🛠 Workshop</button>
-      <button id="btnCouncil">🏛 Council</button>
+      <button id="btnWorkshop">⚒️ Workshop</button>
+      <button id="btnCouncil">🏛️ Council</button>
     </div>
-    <div class="small" id="costs"></div>
+    <div class="small" id="buildInfo"></div>
+    <div class="small cooldown" id="cooldownInfo"></div>
   </div>
 
   <div class="card">
     <h2>City</h2>
-    <div class="city-grid" id="city"></div>
+    <div class="city" id="city"></div>
   </div>
 
   <div class="card">
     <h2>Era</h2>
-    <div class="small"><b>Foundations</b> — slow growth. Every choice matters.</div>
+    <div class="small">
+      <b>Foundations</b> — slow growth, limited space<br/>
+      <span class="locked">Next Era: Classical (locked)</span>
+    </div>
   </div>
 
   <div class="card">
@@ -123,121 +133,147 @@ button:disabled{
 </main>
 
 <script>
-/* ===== STATE ===== */
-const state={
-  pop:10,
+/* ================= STATE ================= */
+const S={
+  pop:20,
   prod:0,
-  stab:100,
+  stab:80,
   time:0,
-  govLevel:0, // 0 Clan, 1 Council
+
   tiles:Array(9).fill(null),
-  counts:{settlement:0,workshop:0,council:0}
-}
+  counts:{settlement:0,workshop:0,council:0},
 
-/* ===== COSTS ===== */
-const cost={
+  baseProd:0.3,
+  cooldown:0
+};
+
+const COST={
   settlement:15,
-  workshop:15,
-  council:0
-}
+  workshop:20,
+  council:30
+};
 
-/* ===== UI ===== */
-const $=id=>document.getElementById(id)
-const log=txt=>{
-  const li=document.createElement("li")
-  li.textContent=txt
-  $("events").prepend(li)
-}
+/* ================= HELPERS ================= */
+const $=id=>document.getElementById(id);
+const log=msg=>{
+  const li=document.createElement("li");
+  li.textContent=msg;
+  $("events").prepend(li);
+};
+const clamp=()=>{
+  S.stab=Math.max(0,Math.min(100,S.stab));
+  S.prod=Math.max(0,S.prod);
+};
 
-/* ===== UPDATE ===== */
-function update(){
-  $("pop").textContent=state.pop.toFixed(1)
-  $("prod").textContent=state.prod.toFixed(1)
-  $("stab").textContent=Math.max(0,Math.min(100,state.stab)).toFixed(0)
-  $("time").textContent=state.time
+/* ================= CITY ================= */
+const ICON={
+  settlement:"🏠",
+  workshop:"⚒️",
+  council:"🏛️"
+};
 
-  $("costs").innerHTML=
-    `Settlement cost: ${cost.settlement} prod<br>
-     Workshop cost: ${cost.workshop} prod`
-
-  $("btnSettlement").disabled=state.prod<cost.settlement
-  $("btnWorkshop").disabled=state.prod<cost.workshop
-  $("btnCouncil").disabled=state.counts.council>=1
-
-  renderCity()
-}
-
-/* ===== CITY ===== */
 function renderCity(){
-  $("city").innerHTML=""
-  state.tiles.forEach(t=>{
-    const d=document.createElement("div")
-    d.className="tile"+(t?"":" empty")
-    d.innerHTML=t?icons[t]:"⬜"
-    $("city").appendChild(d)
-  })
+  $("city").innerHTML="";
+  S.tiles.forEach(t=>{
+    const d=document.createElement("div");
+    d.className="tile"+(t?"" :" empty");
+    d.textContent=t?ICON[t]:"⬜";
+    $("city").appendChild(d);
+  });
 }
 
-/* ===== BUILD ===== */
-const icons={settlement:"🏠",workshop:"🛠",council:"🏛"}
-
-function place(type){
-  const i=state.tiles.indexOf(null)
-  if(i===-1){log("No empty tiles");return false}
-  state.tiles[i]=type
-  state.counts[type]++
-  return true
+/* ================= BUILD LOGIC ================= */
+function canBuild(type){
+  if(S.cooldown>0) return false;
+  if(S.tiles.indexOf(null)===-1) return false;
+  if(S.prod<COST[type]) return false;
+  if(type==="council" && S.counts.council>=1) return false;
+  return true;
 }
 
-$("btnSettlement").onclick=()=>{
-  if(state.prod<cost.settlement)return
-  state.prod-=cost.settlement
-  if(place("settlement")){
-    state.pop+=4
-    state.stab-=8
-    log("Settlement built (+4 pop, -8 stability)")
+function build(type){
+  if(!canBuild(type)) return;
+
+  const slot=S.tiles.indexOf(null);
+  S.tiles[slot]=type;
+  S.prod-=COST[type];
+  S.counts[type]++;
+  S.cooldown=30;
+
+  if(type==="settlement"){
+    const gain=Math.max(1,5-S.counts.settlement);
+    S.pop+=gain;
+    S.stab-=6;
+    log(`Settlement built (+${gain} pop, -6 stability)`);
   }
-  update()
-}
 
-$("btnWorkshop").onclick=()=>{
-  if(state.prod<cost.workshop)return
-  state.prod-=cost.workshop
-  if(place("workshop")){
-    log("Workshop built (+2 production)")
+  if(type==="workshop"){
+    log("Workshop built (industry expands)");
   }
-  update()
-}
 
-$("btnCouncil").onclick=()=>{
-  if(state.counts.council>=1){
-    log("Only one Council allowed")
-    return
+  if(type==="council"){
+    S.stab+=20;
+    log("Council established (+20 stability)");
   }
-  place("council")
-  state.govLevel=1
-  state.stab+=20
-  log("Council established (+20 stability)")
-  update()
+
+  clamp();
+  update();
 }
 
-/* ===== TICK ===== */
+/* ================= UI ================= */
+function update(){
+  $("pop").textContent=S.pop.toFixed(1);
+  $("prod").textContent=S.prod.toFixed(1);
+  $("stab").textContent=S.stab.toFixed(0);
+  $("time").textContent=S.time;
+
+  $("btnSettlement").disabled=!canBuild("settlement");
+  $("btnWorkshop").disabled=!canBuild("workshop");
+  $("btnCouncil").disabled=!canBuild("council");
+
+  $("buildInfo").innerHTML=
+    `Settlement: ${COST.settlement} prod<br/>
+     Workshop: ${COST.workshop} prod<br/>
+     Council: ${COST.council} prod`;
+
+  $("cooldownInfo").textContent=
+    S.cooldown>0 ? `Cooldown: ${S.cooldown}s before next decision` : "";
+
+  renderCity();
+}
+
+/* ================= TICK ================= */
 setInterval(()=>{
-  state.time++
+  S.time++;
 
-  /* BASE PRODUCTION FIX */
-  const baseProd=state.pop*0.05
-  const workshopProd=state.counts.workshop*2
-  state.prod+=baseProd+workshopProd
+  // base production (anti-deadlock)
+  S.prod+=S.baseProd;
 
-  /* STABILITY DECAY ONLY IF OVERPOP */
-  if(state.pop>30) state.stab-=0.2
+  // workshop production
+  S.prod+=S.counts.workshop*1.5;
 
-  update()
-},1000)
+  // stability recovery if idle
+  if(S.cooldown===0 && S.stab<100) S.stab+=0.2;
+
+  // cooldown countdown
+  if(S.cooldown>0) S.cooldown--;
+
+  // light events
+  if(S.time%60===0){
+    log("Time passes. Your realm slowly evolves.");
+  }
+
+  clamp();
+  update();
+},1000);
+
+/* ================= EVENTS ================= */
+$("btnSettlement").onclick=()=>build("settlement");
+$("btnWorkshop").onclick=()=>build("workshop");
+$("btnCouncil").onclick=()=>build("council");
 
 /* INIT */
-update()
+update();
 </script>
 
 </body>
