@@ -31,6 +31,7 @@ header{
   display:flex;
   justify-content:space-between;
   font-size:14px;
+  z-index:10;
 }
 
 main{padding:16px;max-width:500px;margin:auto}
@@ -103,28 +104,40 @@ button:disabled{opacity:.4}
 
   <div class="card">
     <h2>Era</h2>
-    <div>Foundations — fast growth to learn the game.</div>
+    <div><b>Foundations</b> — fast growth to understand the game.</div>
   </div>
 
   <div class="card">
     <h2>Events</h2>
     <div id="events"></div>
     <div class="small" style="margin-top:8px">
-      Production increases every second.<br/>
-      Build wisely during cooldowns.
+      Production grows over time.<br/>
+      Buildings occupy limited slots.
     </div>
   </div>
 </main>
 
 <script>
+/* ===== FOUNDATIONS BASELINE — DO NOT REBALANCE ===== */
+
+const MAX_SLOTS = 9;
+const COOLDOWN = 8;
+
+const COST = {
+  settlement: 15,
+  workshop: 20,
+  council: 30
+};
+
 const DEFAULT = {
-  pop: 10,
+  era: "foundations",
+  pop: 12,
   prod: 30,
   stab: 100,
   time: 0,
   lastAction: 0,
-  buildings: [],
-  events: []
+  buildings: ["⚒️"], // 1 workshop iniziale
+  events: ["• Realm founded with basic craftsmanship"]
 };
 
 function loadState(){
@@ -134,102 +147,107 @@ function loadState(){
   }catch{
     return structuredClone(DEFAULT);
   }
-  if(!s || typeof s!=="object") return structuredClone(DEFAULT);
+  if(!s || typeof s !== "object") return structuredClone(DEFAULT);
 
+  // ripristino difensivo
   for(const k in DEFAULT){
-    if(typeof s[k] !== typeof DEFAULT[k]) s[k]=DEFAULT[k];
+    if(typeof s[k] !== typeof DEFAULT[k]) s[k] = DEFAULT[k];
   }
-
-  if(!Array.isArray(s.buildings)) s.buildings=[];
-  if(!Array.isArray(s.events)) s.events=[];
-  if(!Number.isFinite(s.lastAction)) s.lastAction=0;
+  if(!Array.isArray(s.buildings)) s.buildings = ["⚒️"];
+  if(!Array.isArray(s.events)) s.events = [];
 
   return s;
 }
 
 let state = loadState();
 
-const COST={ settlement:15, workshop:20, council:30 };
-const COOLDOWN=10;
-
 function save(){
-  localStorage.setItem("idleRealm",JSON.stringify(state));
+  localStorage.setItem("idleRealm", JSON.stringify(state));
 }
 
 function log(msg){
-  state.events.unshift("• "+msg);
-  state.events=state.events.slice(0,8);
+  state.events.unshift("• " + msg);
+  state.events = state.events.slice(0,10);
 }
 
 function canAct(){
-  return Date.now()-state.lastAction >= COOLDOWN*1000;
+  return Date.now() - state.lastAction >= COOLDOWN * 1000;
 }
 
 function update(){
-  document.getElementById("pop").innerText=state.pop.toFixed(1);
-  document.getElementById("prod").innerText=state.prod.toFixed(1);
-  document.getElementById("stab").innerText=Math.max(0,Math.min(100,state.stab)).toFixed(0);
-  document.getElementById("time").innerText=state.time;
+  pop.innerText = state.pop.toFixed(1);
+  prod.innerText = state.prod.toFixed(1);
+  stab.innerText = Math.max(0,Math.min(100,state.stab)).toFixed(0);
+  time.innerText = state.time;
 
-  const cd=Math.max(0,Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000));
-  document.getElementById("info").innerText=
-    `Settlement ${COST.settlement} | Workshop ${COST.workshop} | Council ${COST.council} • `+
-    (canAct()?"Ready":"Cooldown "+cd+"s");
+  const cd = Math.max(0,
+    Math.ceil((COOLDOWN*1000 - (Date.now()-state.lastAction))/1000)
+  );
 
-  document.getElementById("btnSettle").disabled=!canAct()||state.prod<COST.settlement||state.buildings.length>=12;
-  document.getElementById("btnWork").disabled=!canAct()||state.prod<COST.workshop||state.buildings.length>=12;
-  document.getElementById("btnCouncil").disabled=!canAct()||state.prod<COST.council||state.buildings.includes("🏛️");
+  info.innerText =
+    `Settlement ${COST.settlement} | Workshop ${COST.workshop} | Council ${COST.council}` +
+    (canAct() ? " • Ready" : ` • Cooldown ${cd}s`);
 
-  const city=document.getElementById("city");
-  city.innerHTML="";
-  for(let i=0;i<12;i++){
+  btnSettle.disabled =
+    !canAct() || state.prod < COST.settlement || state.buildings.length >= MAX_SLOTS;
+
+  btnWork.disabled =
+    !canAct() || state.prod < COST.workshop || state.buildings.length >= MAX_SLOTS;
+
+  btnCouncil.disabled =
+    !canAct() || state.prod < COST.council || state.buildings.includes("🏛️");
+
+  city.innerHTML = "";
+  for(let i=0;i<MAX_SLOTS;i++){
     const t=document.createElement("div");
     t.className="tile";
-    t.innerText=state.buildings[i]||"⬜";
+    t.innerText = state.buildings[i] || "⬜";
     city.appendChild(t);
   }
 
-  document.getElementById("events").innerHTML=
-    state.events.map(e=>`<div>${e}</div>`).join("");
-
+  events.innerHTML = state.events.map(e=>`<div>${e}</div>`).join("");
   save();
 }
 
 function build(type){
   if(!canAct()) return;
+
   if(type==="settlement"){
-    state.prod-=COST.settlement;
-    state.pop+=4;
-    state.stab-=5;
+    state.prod -= COST.settlement;
+    state.pop += 4;
+    state.stab -= 6;
     state.buildings.push("🏠");
     log("Settlement built");
   }
+
   if(type==="workshop"){
-    state.prod-=COST.workshop;
-    state.prod+=5;
-    state.stab-=3;
+    state.prod -= COST.workshop;
     state.buildings.push("⚒️");
     log("Workshop built");
   }
+
   if(type==="council"){
-    state.prod-=COST.council;
-    state.stab+=15;
+    state.prod -= COST.council;
+    state.stab += 15;
     state.buildings.push("🏛️");
     log("Council established");
   }
-  state.lastAction=Date.now();
+
+  state.lastAction = Date.now();
   update();
 }
 
-btnSettle.onclick=()=>build("settlement");
-btnWork.onclick=()=>build("workshop");
-btnCouncil.onclick=()=>build("council");
+btnSettle.onclick = () => build("settlement");
+btnWork.onclick   = () => build("workshop");
+btnCouncil.onclick= () => build("council");
 
 setInterval(()=>{
   state.time++;
-  const workshops=state.buildings.filter(b=>b==="⚒️").length;
-  state.prod+=Math.max(1,workshops*0.4);
-  if(state.stab<100) state.stab+=0.1;
+
+  const workshops = state.buildings.filter(b=>b==="⚒️").length;
+  state.prod += workshops * 0.8;
+
+  if(state.stab < 100) state.stab += 0.1;
   update();
 },1000);
 
