@@ -12,6 +12,7 @@
   --card2:#1b2546;
   --accent:#2f5bff;
   --danger:#ff4d6d;
+  --warn:#ffb703;
   --text:#e6ecff;
   --muted:#9aa4c7;
 }
@@ -49,10 +50,19 @@ button:disabled{opacity:.45}
   background:#0f1730;border-radius:12px;height:72px;
   display:flex;align-items:center;justify-content:center;
   font-size:28px;
+  position:relative;
 }
 .tile.empty{opacity:.15}
-.goal{padding:8px 0;font-size:14px}
+.tile.selectable{outline:2px solid var(--warn)}
+.goal{padding:6px 0;font-size:14px}
 .goal.done{color:#7dffb3}
+.overlay{
+  position:fixed;inset:0;
+  background:rgba(5,10,20,.85);
+  display:none;align-items:center;justify-content:center;
+  z-index:50;
+}
+.overlay .card{max-width:420px;width:90%}
 </style>
 </head>
 
@@ -69,7 +79,7 @@ button:disabled{opacity:.45}
 
 <main>
 
-<h1>Idle Realm</h1>
+<h1 id="title">Idle Realm</h1>
 <div class="small">A strategic realm shaped by irreversible choices</div>
 
 <div class="card">
@@ -82,9 +92,7 @@ button:disabled{opacity:.45}
   <button id="btnMine" style="display:none">⛏️ Mine (⚒️40)</button>
   <button id="btnSmelter" style="display:none">🔥 Smelter (⚒️60 + 🪨10)</button>
 
-  <button class="alt" id="btnPolicy" style="display:none">
-    ⚖️ Enact Policy
-  </button>
+  <button class="alt" id="btnPolicy" style="display:none">⚖️ Enact Industrial Policy</button>
 
   <div class="small" id="info"></div>
 </div>
@@ -92,8 +100,8 @@ button:disabled{opacity:.45}
 <div class="card">
   <h2>City</h2>
   <div class="grid" id="city"></div>
-  <button class="danger" id="btnDismantle">🧹 Dismantle Last District</button>
-  <div class="small">Strategic rollback. No refunds.</div>
+  <button class="danger" id="btnSelectRemove">🧹 Dismantle a District</button>
+  <div class="small">Choose which district to dismantle. No refunds.</div>
 </div>
 
 <div class="card">
@@ -114,31 +122,26 @@ button:disabled{opacity:.45}
 
 </main>
 
+<!-- SELECT DISMANTLE OVERLAY -->
+<div class="overlay" id="overlay">
+  <div class="card">
+    <h2>Select a District</h2>
+    <div class="grid" id="selectGrid"></div>
+    <button class="alt" onclick="closeOverlay()">Cancel</button>
+  </div>
+</div>
+
 <script>
 const BASE_SLOTS=9;
 const COOLDOWN=8;
-
-const COST={
-  settlement:15,
-  workshop:20,
-  council:30,
-  mine:40,
-  smelter:60
-};
+const COST={settlement:15,workshop:20,council:30,mine:40,smelter:60};
 
 const DEFAULT={
   era:"foundations",
-  pop:12,
-  prod:30,
-  stab:100,
-  time:0,
-  lastAction:0,
+  pop:12,prod:30,stab:100,time:0,lastAction:0,
   buildings:["⚒️"],
   events:["Realm founded with basic craftsmanship"],
-  ore:0,
-  bronze:0,
-  policy:null,
-  lastSeen:Date.now()
+  ore:0,bronze:0,policy:null,lastSeen:Date.now()
 };
 
 function loadState(){
@@ -151,7 +154,6 @@ function loadState(){
   if(!Array.isArray(s.events)) s.events=[];
   return s;
 }
-
 let state=loadState();
 
 function save(){
@@ -167,31 +169,22 @@ function log(msg,star=false){
 function canAct(){
   return Date.now()-state.lastAction>=COOLDOWN*1000;
 }
+function maxSlots(){return state.era==="bronze"?12:BASE_SLOTS;}
 
-function maxSlots(){
-  return state.era==="bronze"?12:BASE_SLOTS;
-}
-
-/* ==== OBJECTIVES ==== */
 function eraGoals(){
   if(state.era==="foundations"){
     return [
-      {txt:"Build a Council", ok:state.buildings.includes("🏛️")},
-      {txt:"Fill all city slots", ok:state.buildings.length>=BASE_SLOTS}
+      {txt:"Build a Council",ok:state.buildings.includes("🏛️")},
+      {txt:"Fill all city slots",ok:state.buildings.length>=BASE_SLOTS}
     ];
   }
   return [
-    {txt:"Produce 50 Bronze", ok:state.bronze>=50},
-    {txt:"Build 2 Smelters", ok:state.buildings.filter(b=>b==="🔥").length>=2},
-    {txt:"Maintain Stability 100%", ok:state.stab>=100}
+    {txt:"Produce 50 Bronze",ok:state.bronze>=50},
+    {txt:"Build 2 Smelters",ok:state.buildings.filter(b=>b==="🔥").length>=2},
+    {txt:"Maintain Stability 100%",ok:state.stab>=100}
   ];
 }
 
-function goalsCompleted(){
-  return eraGoals().every(g=>g.ok);
-}
-
-/* ==== UPDATE ==== */
 function update(){
   pop.innerText=state.pop.toFixed(1);
   prod.innerText=state.prod.toFixed(0);
@@ -202,7 +195,7 @@ function update(){
 
   info.innerText=canAct()
     ?"Choose carefully. Every action reshapes the realm."
-    :"The realm is responding to your last decree…";
+    :"The realm responds to your last decree…";
 
   btnSettle.disabled=!canAct()||state.prod<COST.settlement||state.buildings.length>=maxSlots();
   btnWork.disabled=!canAct()||state.prod<COST.workshop||state.buildings.length>=maxSlots();
@@ -210,7 +203,7 @@ function update(){
 
   btnMine.style.display=state.era==="bronze"?"block":"none";
   btnSmelter.style.display=state.era==="bronze"?"block":"none";
-  btnPolicy.style.display=state.era==="bronze"&& !state.policy?"block":"none";
+  btnPolicy.style.display=state.era==="bronze"&&!state.policy?"block":"none";
 
   btnMine.disabled=!canAct()||state.prod<COST.mine||state.buildings.length>=maxSlots();
   btnSmelter.disabled=!canAct()||state.prod<COST.smelter||state.ore<10||state.buildings.length>=maxSlots();
@@ -224,61 +217,30 @@ function update(){
   }
 
   goals.innerHTML=eraGoals().map(g=>
-    `<div class="goal ${g.ok?"done":""}">
-      ${g.ok?"✔":"◻"} ${g.txt}
-    </div>`
+    `<div class="goal ${g.ok?"done":""}">${g.ok?"✔":"◻"} ${g.txt}</div>`
   ).join("");
 
-  eraTitle.innerText=state.era==="foundations"?"Foundations":"Age of Bronze";
-  eraDesc.innerText=state.era==="foundations"
-    ?"Survival, growth and irreversible decisions."
-    :"Industry, specialization and strategic tension.";
+  if(state.era==="foundations"){
+    eraTitle.innerText="Foundations";
+    eraDesc.innerText="Survival, growth and irreversible decisions.";
+  }else{
+    eraTitle.innerText="Age of Bronze";
+    eraDesc.innerText="Industry rises… but darker times loom beyond the horizon.";
+  }
 
   events.innerHTML=state.events.map(e=>`<div class="small">${e}</div>`).join("");
   save();
 }
 
-/* ==== ACTIONS ==== */
-function act(){
-  state.lastAction=Date.now();
-  update();
-}
+function act(){state.lastAction=Date.now();update();}
 
 function build(type){
   if(!canAct()) return;
-
-  if(type==="settlement"){
-    state.prod-=COST.settlement;
-    state.pop+=4;
-    state.stab-=6;
-    state.buildings.push("🏠");
-    log("Families settle the land");
-  }
-  if(type==="workshop"){
-    state.prod-=COST.workshop;
-    state.buildings.push("⚒️");
-    log("Craftsmanship expands");
-  }
-  if(type==="council"){
-    state.prod-=COST.council;
-    state.stab+=15;
-    state.buildings.push("🏛️");
-    log("Order is established",true);
-  }
-  if(type==="mine"){
-    state.prod-=COST.mine;
-    state.stab-=2;
-    state.buildings.push("⛏️");
-    log("Miners dig deeper into the earth");
-  }
-  if(type==="smelter"){
-    state.prod-=COST.smelter;
-    state.ore-=10;
-    state.stab-=3;
-    state.buildings.push("🔥");
-    log("Bronze reshapes production");
-  }
-
+  if(type==="settlement"){state.prod-=15;state.pop+=4;state.stab-=6;state.buildings.push("🏠");log("Families settle the land");}
+  if(type==="workshop"){state.prod-=20;state.buildings.push("⚒️");log("Craftsmanship expands");}
+  if(type==="council"){state.prod-=30;state.stab+=15;state.buildings.push("🏛️");log("Order is established",true);}
+  if(type==="mine"){state.prod-=40;state.stab-=2;state.buildings.push("⛏️");log("Miners dig deeper");}
+  if(type==="smelter"){state.prod-=60;state.ore-=10;state.stab-=3;state.buildings.push("🔥");log("Bronze reshapes production");}
   act();
 }
 
@@ -292,28 +254,52 @@ btnPolicy.onclick=()=>{
   state.policy="industrial";
   state.prod*=1.15;
   state.stab-=10;
-  log("An industrial policy reshapes society",true);
+  log("An industrial doctrine reshapes society",true);
   act();
 };
 
-btnDismantle.onclick=()=>{
-  if(state.buildings.length<=1) return;
-  const r=state.buildings.pop();
-  log(`A ${r} district is dismantled`);
-  update();
+/* ==== SELECTIVE DISMANTLE ==== */
+btnSelectRemove.onclick=()=>{
+  const grid=document.getElementById("selectGrid");
+  grid.innerHTML="";
+  state.buildings.forEach((b,i)=>{
+    const t=document.createElement("div");
+    t.className="tile selectable";
+    t.innerText=b;
+    t.onclick=()=>{
+      state.buildings.splice(i,1);
+      log(`A ${b} district is dismantled`);
+      closeOverlay();
+      update();
+    };
+    grid.appendChild(t);
+  });
+  overlay.style.display="flex";
 };
+function closeOverlay(){overlay.style.display="none";}
+
+/* ==== DEBUG RESET ==== */
+const debugEnabled=new URLSearchParams(location.search).get("debug")==="true";
+let pressTimer;
+title.addEventListener("touchstart",()=>{
+  pressTimer=setTimeout(()=>{
+    if(debugEnabled){
+      localStorage.removeItem("idleRealm");
+      location.reload();
+    }
+  },5000);
+});
+title.addEventListener("touchend",()=>clearTimeout(pressTimer));
 
 /* ==== LOOP ==== */
 setInterval(()=>{
   state.time++;
-  const workshops=state.buildings.filter(b=>b==="⚒️").length;
-  const mines=state.buildings.filter(b=>b==="⛏️").length;
-  const smelters=state.buildings.filter(b=>b==="🔥").length;
-
-  state.prod+=workshops*0.8;
-  state.ore+=mines*0.3;
-  state.bronze+=Math.min(smelters*0.2,state.ore);
-
+  const w=state.buildings.filter(b=>b==="⚒️").length;
+  const m=state.buildings.filter(b=>b==="⛏️").length;
+  const s=state.buildings.filter(b=>b==="🔥").length;
+  state.prod+=w*0.8;
+  state.ore+=m*0.3;
+  state.bronze+=Math.min(s*0.2,state.ore);
   if(state.stab<100) state.stab+=0.1;
   update();
 },1000);
