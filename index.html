@@ -75,8 +75,6 @@ button:disabled{opacity:.45}
   font-size:28px;
   transition:transform .12s ease;
 }
-
-.highlight{color:#fff;font-weight:600}
 </style>
 </head>
 
@@ -96,12 +94,18 @@ button:disabled{opacity:.45}
 
 <div class="card">
   <h2>Build</h2>
-
   <button id="btnSettle">🏠 Settle New Families</button>
   <button id="btnWork">⚒️ Expand Craftsmanship</button>
   <button id="btnCouncil">🏛️ Form the Council</button>
-
   <div class="small" id="info"></div>
+</div>
+
+<div class="card" id="advanceCard" style="display:none">
+  <h2>Foundations Complete</h2>
+  <div class="small" style="margin-bottom:12px">
+    Your realm is stable and ready to grow beyond survival.
+  </div>
+  <button id="btnAdvance">⏭ Advance to the Age of Bronze</button>
 </div>
 
 <div class="card">
@@ -111,7 +115,7 @@ button:disabled{opacity:.45}
 
 <div class="card">
   <h2>Era</h2>
-  <div><b>Foundations</b></div>
+  <div><b id="eraTitle"></b></div>
   <div class="small" id="eraDesc"></div>
 </div>
 
@@ -160,6 +164,7 @@ function loadState(){
   }
   if(!Array.isArray(s.buildings)) s.buildings=["⚒️"];
   if(!Array.isArray(s.events)) s.events=[];
+  if(typeof s.lastAction!=="number" || isNaN(s.lastAction)) s.lastAction=0;
   return s;
 }
 
@@ -171,11 +176,18 @@ function save(){
 
 function log(msg,important=false){
   state.events.unshift((important?"★ ":"• ")+msg);
-  state.events=state.events.slice(0,6);
+  state.events = state.events.slice(0,6);
 }
 
 function canAct(){
-  return Date.now()-state.lastAction >= COOLDOWN*1000;
+  if(!state.lastAction || isNaN(state.lastAction)) return true;
+  return Date.now() - state.lastAction >= COOLDOWN*1000;
+}
+
+function canAdvanceEra(){
+  return state.era==="foundations"
+    && state.buildings.includes("🏛️")
+    && state.buildings.length>=MAX_SLOTS;
 }
 
 function checkFoundationsProgress(){
@@ -219,6 +231,8 @@ function update(){
   btnCouncil.disabled =
     !canAct() || state.prod < COST.council || state.buildings.includes("🏛️");
 
+  advanceCard.style.display = canAdvanceEra() ? "block" : "none";
+
   city.innerHTML="";
   for(let i=0;i<MAX_SLOTS;i++){
     const t=document.createElement("div");
@@ -227,9 +241,15 @@ function update(){
     city.appendChild(t);
   }
 
-  eraDesc.innerText = state.foundationsDone
-    ? "The realm is stable and ready to grow beyond survival."
-    : "Fast growth to understand the basics of the realm.";
+  if(state.era==="foundations"){
+    eraTitle.innerText="Foundations";
+    eraDesc.innerText = state.foundationsDone
+      ? "The realm is stable and ready to grow beyond survival."
+      : "Fast growth to understand the basics of the realm.";
+  }else{
+    eraTitle.innerText="Age of Bronze";
+    eraDesc.innerText="A new age dawns. Resources and ambition expand.";
+  }
 
   events.innerHTML = state.events.map(e=>`<div class="small">${e}</div>`).join("");
   save();
@@ -259,13 +279,20 @@ function build(type){
     log("The people demand order. A council is formed.",true);
   }
 
-  state.lastAction=Date.now();
+  state.lastAction = Date.now();
   update();
 }
 
-btnSettle.onclick=()=>build("settlement");
-btnWork.onclick=()=>build("workshop");
-btnCouncil.onclick=()=>build("council");
+btnSettle.onclick = ()=>build("settlement");
+btnWork.onclick = ()=>build("workshop");
+btnCouncil.onclick = ()=>build("council");
+
+btnAdvance.onclick = ()=>{
+  if(!canAdvanceEra()) return;
+  state.era="bronze";
+  log("The Age of Bronze begins. New possibilities emerge.",true);
+  update();
+};
 
 setInterval(()=>{
   state.time++;
