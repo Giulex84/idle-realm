@@ -1,344 +1,344 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Idle Realm</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Idle Realm</title>
 
-  <!-- Pi SDK -->
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-  <script>
-    Pi.init({ version: "2.0" });
-  </script>
+<!-- =========================
+     STYLE
+========================= -->
+<style>
+:root{
+  --bg:#0b1220;
+  --card:#141c33;
+  --card2:#1b2547;
+  --accent:#3b82f6;
+  --danger:#ff5a7a;
+  --text:#e6ebff;
+  --muted:#9aa4c7;
+  --ok:#22c55e;
+}
+*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto;}
+body{
+  margin:0;
+  background:linear-gradient(180deg,#0a1020,#050814);
+  color:var(--text);
+}
+header{
+  position:sticky;top:0;z-index:10;
+  background:#060b18;
+  padding:8px 12px;
+  display:flex;gap:12px;justify-content:space-between;
+  font-size:13px;
+}
+header span{white-space:nowrap}
+main{max-width:520px;margin:auto;padding:12px}
 
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: radial-gradient(circle at top, #0e1530, #050814);
-      color: #fff;
-    }
-    .card {
-      background: linear-gradient(180deg, #121c3f, #0b1025);
-      border-radius: 18px;
-      padding: 20px;
-      margin: 16px;
-    }
-    h1, h2, h3 { margin-top: 0; }
-    button {
-      width: 100%;
-      padding: 14px;
-      margin: 6px 0;
-      border-radius: 12px;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      background: #3b82f6;
-      color: #fff;
-    }
-    button:disabled {
-      background: #1e3a8a;
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .danger { background: #fb7185; }
-    .muted { opacity: 0.6; font-size: 14px; }
-    .check { color: #4ade80; }
-    .slot-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 10px;
-    }
-    .slot {
-      height: 64px;
-      border-radius: 12px;
-      background: #0b1333;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 28px;
-    }
-    .cooldown {
-      opacity: 0.5;
-      pointer-events: none;
-    }
-  </style>
+/* cards */
+.card{
+  background:linear-gradient(180deg,var(--card),var(--card2));
+  border-radius:16px;
+  padding:12px;
+  margin-bottom:12px;
+}
+
+/* era */
+.era-title{font-size:14px;color:var(--muted);margin-bottom:4px}
+.era-name{font-size:18px;font-weight:600;margin-bottom:6px}
+
+/* objectives */
+.obj{font-size:13px;display:flex;gap:6px;align-items:center}
+.obj.ok{color:var(--ok)}
+button.advance{
+  width:100%;margin-top:8px;
+  padding:12px;border:none;border-radius:14px;
+  background:#1f3b8a;color:white;font-size:16px;
+  opacity:.4;
+}
+button.advance.enabled{opacity:1;background:var(--accent)}
+
+/* decisions */
+.decisions button{
+  width:100%;border:none;border-radius:14px;
+  padding:14px;margin-bottom:8px;
+  background:var(--accent);color:white;font-size:15px;
+  position:relative;
+}
+.decisions button:disabled{opacity:.35}
+.tooltip{
+  display:none;
+  position:absolute;left:10px;right:10px;top:100%;
+  background:#020617;
+  padding:8px;border-radius:10px;
+  font-size:12px;color:var(--muted);
+}
+.decisions button:hover .tooltip{display:block}
+
+/* city slots */
+.slots{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:8px;
+}
+.slot{
+  height:58px;border-radius:12px;
+  background:#0f1730;
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;cursor:pointer;
+}
+.slot.empty{opacity:.4}
+
+/* chronicle */
+.chronicle{font-size:12px;color:var(--muted)}
+.chronicle div{margin-bottom:4px}
+
+/* reset */
+.reset{
+  width:100%;border:none;border-radius:14px;
+  padding:14px;margin-top:10px;
+  background:var(--danger);color:white;font-size:16px;
+}
+.small{font-size:12px;color:var(--muted);text-align:center}
+</style>
 </head>
 
 <body>
 
-<div id="termsCard" class="card">
-  <h2>Terms of Service & Privacy Policy</h2>
-  <p class="muted">
-    Idle Realm is provided "as is" for entertainment purposes only.
-    No payments or ads are enabled during review.
-    Balance and mechanics may change.
-  </p>
-  <p class="muted">
-    This app does not collect, store, or transmit personal data.
-    No analytics or tracking services are used.
-  </p>
-  <label>
-    <input type="checkbox" id="acceptTerms" />
-    I agree to the Terms of Service and Privacy Policy
-  </label>
-  <button id="enterGame" disabled>Continue to Idle Realm</button>
+<!-- =========================
+     HEADER
+========================= -->
+<header>
+  <span>👥 <b id="pop">1.0</b></span>
+  <span>🔧 <b id="tools">10</b></span>
+  <span>⛏ <b id="ore">0</b></span>
+  <span>🥉 <b id="bronze">0</b></span>
+  <span>🛡 <b id="stab">100%</b></span>
+</header>
+
+<main>
+
+<!-- =========================
+     ERA
+========================= -->
+<div class="card">
+  <div class="era-title">Current Era</div>
+  <div class="era-name" id="eraName">Tribal Age</div>
+
+  <div id="objectives"></div>
+
+  <button id="advanceBtn" class="advance">Advance to Next Era</button>
 </div>
 
-<div id="game" style="display:none">
+<!-- =========================
+     DECISIONS
+========================= -->
+<div class="card decisions" id="decisions"></div>
 
-  <div class="card">
-    <h1>Idle Realm</h1>
-    <p class="muted">A strategic realm shaped by irreversible choices</p>
-    <div id="stats"></div>
-  </div>
-
-  <div class="card">
-    <h2 id="eraTitle"></h2>
-    <p class="muted" id="eraDesc"></p>
-  </div>
-
-  <div class="card">
-    <h3>Era Objectives</h3>
-    <div id="objectives"></div>
-    <button id="advanceEra" disabled>Advance to Next Era</button>
-  </div>
-
-  <div class="card">
-    <h3>Decisions</h3>
-    <div id="decisions"></div>
-    <p class="muted" id="cooldownText"></p>
-  </div>
-
-  <div class="card">
-    <h3>City Slots</h3>
-    <div class="slot-grid" id="slots"></div>
-  </div>
-
-  <div class="card">
-    <h3>Chronicle</h3>
-    <div id="log" class="muted"></div>
-  </div>
-
-  <div class="card">
-    <button class="danger" onclick="resetProgress()">Reset Progress (Review Mode)</button>
-    <p class="muted">Temporary. Will be removed after review.</p>
-  </div>
-
+<!-- =========================
+     CITY
+========================= -->
+<div class="card">
+  <div class="era-name">City Slots</div>
+  <div class="slots" id="slots"></div>
 </div>
 
+<!-- =========================
+     CHRONICLE
+========================= -->
+<div class="card">
+  <div class="era-name">Chronicle</div>
+  <div class="chronicle" id="log"></div>
+</div>
+
+<!-- =========================
+     RESET (REVIEW ONLY)
+========================= -->
+<button class="reset" onclick="resetGame()">Reset Progress (Review Mode)</button>
+<div class="small">Temporary. Will be removed after review.</div>
+
+</main>
+
+<!-- =========================
+     SCRIPT
+========================= -->
 <script>
-/* ---------------- STATE ---------------- */
-const ERAS = [
-  {
-    id: 1,
-    name: "Tribal Age",
-    desc: "Small settlements and survival.",
-    cooldown: 5000,
-    slots: 5,
-    objectives: () => [
-      { label: "Population ≥ 6", done: state.population >= 6 },
-      { label: "Tools ≥ 40", done: state.tools >= 40 },
-      { label: "Council built", done: state.council >= 1 },
-      { label: "Stability ≥ 80%", done: state.stability >= 80 }
-    ]
-  },
-  {
-    id: 2,
-    name: "Age of Bronze",
-    desc: "Industry and specialization emerge.",
-    cooldown: 8000,
-    slots: () => 5 + state.council,
-    objectives: () => [
-      { label: "Build 1 Mine", done: state.mine >= 1 },
-      { label: "Build 1 Smelter", done: state.smelter >= 1 },
-      { label: "Produce 50 Bronze", done: state.bronze >= 50 },
-      { label: "Stability ≥ 80%", done: state.stability >= 80 }
-    ]
-  },
-  {
-    id: 3,
-    name: "Iron Age",
-    desc: "External threats loom. (Coming soon)",
-    locked: true
+/* ---------- STATE ---------- */
+let state={
+  era:1,
+  pop:1.0,
+  tools:10,
+  ore:0,
+  bronze:0,
+  stability:100,
+  slots:5,
+  city:[],
+  lastAction:0,
+  cooldown:5000,
+  log:[]
+};
+
+/* ---------- HELPERS ---------- */
+function canAct(){
+  return Date.now()-state.lastAction>=state.cooldown;
+}
+function act(){
+  state.lastAction=Date.now();
+}
+function addLog(t){
+  state.log.unshift(t);
+  state.log=state.log.slice(0,6);
+}
+function updateHeader(){
+  pop.textContent=state.pop.toFixed(1);
+  tools.textContent=state.tools;
+  ore.textContent=state.ore;
+  bronze.textContent=state.bronze;
+  stab.textContent=state.stability+"%";
+}
+
+/* ---------- ERA LOGIC ---------- */
+function objectives(){
+  let o=[];
+  if(state.era===1){
+    o=[
+      ["Population ≥ 6",state.pop>=6],
+      ["Tools ≥ 40",state.tools>=40],
+      ["Council built",state.city.includes("🏛")],
+      ["Stability ≥ 80%",state.stability>=80]
+    ];
   }
-];
-
-let state = JSON.parse(localStorage.getItem("idleRealm")) || {
-  era: 1,
-  population: 1,
-  tools: 20,
-  ore: 0,
-  bronze: 0,
-  stability: 100,
-  slotsUsed: [],
-  council: 0,
-  mine: 0,
-  smelter: 0,
-  lastAction: 0,
-  log: []
-};
-
-/* ---------------- AUTH + TERMS ---------------- */
-Pi.authenticate(["username"], () => {}, () => {});
-const enterBtn = document.getElementById("enterGame");
-document.getElementById("acceptTerms").onchange = e => {
-  enterBtn.disabled = !e.target.checked;
-};
-enterBtn.onclick = () => {
-  document.getElementById("termsCard").style.display = "none";
-  document.getElementById("game").style.display = "block";
-  render();
-};
-
-/* ---------------- GAME LOGIC ---------------- */
-function cooldownReady() {
-  const cd = ERAS[state.era - 1].cooldown;
-  return Date.now() - state.lastAction >= cd;
+  if(state.era===2){
+    o=[
+      ["Build 1 Mine",state.city.includes("⛏")],
+      ["Build 1 Smelter",state.city.includes("🔥")],
+      ["Produce 50 Bronze",state.bronze>=50],
+      ["Stability ≥ 80%",state.stability>=80],
+      ["Council built",state.city.includes("🏛")]
+    ];
+  }
+  return o;
 }
 
-function action(fn) {
-  if (!cooldownReady()) return;
-  fn();
-  state.lastAction = Date.now();
-  save();
-  render();
-}
+/* ---------- UI RENDER ---------- */
+function render(){
+  updateHeader();
 
-function addLog(msg) {
-  state.log.unshift(msg);
-  state.log = state.log.slice(0, 20);
-}
+  eraName.textContent=
+    state.era===1?"Tribal Age":
+    state.era===2?"Bronze Age":"Iron Age (Locked)";
 
-function save() {
-  localStorage.setItem("idleRealm", JSON.stringify(state));
-}
+  // objectives
+  objectives().forEach(o=>{
+    let d=document.createElement("div");
+    d.className="obj "+(o[1]?"ok":"");
+    d.innerHTML=(o[1]?"✔":"☐")+" "+o[0];
+    objectivesDiv.appendChild(d);
+  });
 
-/* ---------------- ACTIONS ---------------- */
-function settle() {
-  action(() => {
-    if (state.tools < 15) return;
-    state.tools -= 15;
-    state.population += 0.5;
-    state.stability -= 2;
-    state.slotsUsed.push("🏠");
-    addLog("Families settled");
+  // advance
+  let ok=objectives().every(o=>o[1]);
+  advanceBtn.classList.toggle("enabled",ok);
+  advanceBtn.onclick=()=>{if(ok)advanceEra()};
+
+  // decisions
+  decisions.innerHTML="";
+  if(state.era===1){
+    addDecision("🏠 Settle Families",
+      ()=>{state.tools-=15;state.pop+=0.5;state.stability-=2;state.city.push("🏠");act();addLog("Families settled")},
+      state.tools>=15 && canAct(),
+      "Cost: 15 tools\n+0.5 population\n-2% stability"
+    );
+    addDecision("🔧 Workshop",
+      ()=>{state.tools+=5;state.stability-=1;act();addLog("Workshop operated")},
+      canAct(),
+      "+5 tools\n-1% stability"
+    );
+    addDecision("🏛 Council",
+      ()=>{state.tools-=30;state.stability+=15;state.city.push("🏛");act();addLog("Council built")},
+      state.tools>=30 && canAct(),
+      "Cost: 30 tools\n+15% stability\nRequired to advance"
+    );
+  }
+
+  if(state.era===2){
+    addDecision("⛏ Mine",
+      ()=>{state.tools-=40;state.city.push("⛏");act();addLog("Mine built")},
+      state.tools>=40 && canAct(),
+      "Cost: 40 tools\nProduces ore every 8s"
+    );
+    addDecision("🔥 Smelter",
+      ()=>{state.tools-=60;state.ore-=10;state.city.push("🔥");act();addLog("Smelter built")},
+      state.tools>=60 && state.ore>=10 && canAct(),
+      "Cost: 60 tools + 10 ore\nConverts ore to bronze"
+    );
+  }
+
+  // slots
+  slots.innerHTML="";
+  for(let i=0;i<state.slots;i++){
+    let s=document.createElement("div");
+    s.className="slot";
+    if(state.city[i]){
+      s.textContent=state.city[i];
+      s.onclick=()=>{state.city.splice(i,1);addLog("District dismantled");render()}
+    }else{
+      s.classList.add("empty");
+    }
+    slots.appendChild(s);
+  }
+
+  // chronicle
+  log.innerHTML="";
+  state.log.forEach(l=>{
+    let d=document.createElement("div");
+    d.textContent="• "+l;
+    log.appendChild(d);
   });
 }
 
-function workshop() {
-  action(() => {
-    state.tools += 5;
-    state.stability -= 1;
-    state.slotsUsed.push("🔧");
-    addLog("Workshop operated");
-  });
+/* ---------- DECISION BUTTON ---------- */
+function addDecision(label,fn,enabled,tip){
+  let b=document.createElement("button");
+  b.textContent=label;
+  b.disabled=!enabled;
+  b.onclick=()=>{fn();render()};
+  let t=document.createElement("div");
+  t.className="tooltip";
+  t.textContent=tip;
+  b.appendChild(t);
+  decisions.appendChild(b);
 }
 
-function buildCouncil() {
-  action(() => {
-    if (state.tools < 30) return;
-    state.tools -= 30;
-    state.stability += 15;
-    state.council++;
-    state.slotsUsed.push("🏛");
-    addLog("Council established");
-  });
-}
-
-function buildMine() {
-  action(() => {
-    if (state.tools < 40) return;
-    state.tools -= 40;
-    state.mine++;
-    state.slotsUsed.push("⛏");
-    addLog("Mine built");
-  });
-}
-
-function buildSmelter() {
-  action(() => {
-    if (state.tools < 60 || state.ore < 10) return;
-    state.tools -= 60;
-    state.ore -= 10;
-    state.smelter++;
-    state.slotsUsed.push("🔥");
-    addLog("Smelter built");
-  });
-}
-
-/* ---------------- ERA ADVANCE ---------------- */
-function canAdvance() {
-  const era = ERAS[state.era - 1];
-  return era.objectives().every(o => o.done);
-}
-
-function advanceEra() {
-  if (!canAdvance()) return;
-  state.era++;
-  addLog(`Entered ${ERAS[state.era - 1].name}`);
-  save();
+/* ---------- ERA ADVANCE ---------- */
+function advanceEra(){
+  if(state.era===1){
+    state.era=2;
+    state.cooldown=8000;
+    addLog("Bronze Age begins");
+  }
   render();
 }
 
-/* ---------------- RESET ---------------- */
-function resetProgress() {
-  localStorage.removeItem("idleRealm");
+/* ---------- RESET ---------- */
+function resetGame(){
+  localStorage.clear();
   location.reload();
 }
 
-/* ---------------- RENDER ---------------- */
-function render() {
-  const era = ERAS[state.era - 1];
-
-  document.getElementById("stats").innerHTML = `
-    👥 ${state.population.toFixed(1)} |
-    🔧 ${state.tools} |
-    ⛏ ${state.ore} |
-    🪙 ${state.bronze} |
-    🛡 ${state.stability}%
-  `;
-
-  document.getElementById("eraTitle").innerText = era.name;
-  document.getElementById("eraDesc").innerText = era.desc;
-
-  document.getElementById("objectives").innerHTML =
-    era.objectives().map(o =>
-      `<div>${o.done ? "✔" : "☐"} ${o.label}</div>`
-    ).join("");
-
-  document.getElementById("advanceEra").disabled = !canAdvance();
-  document.getElementById("advanceEra").onclick = advanceEra;
-
-  const decisions = [];
-  if (state.era === 1) {
-    decisions.push(`<button onclick="settle()">🏠 Settle Families (15 tools)</button>`);
-    decisions.push(`<button onclick="workshop()">🔧 Workshop (+5 tools)</button>`);
-    decisions.push(`<button onclick="buildCouncil()">🏛 Council (30 tools)</button>`);
+/* ---------- PASSIVE ---------- */
+setInterval(()=>{
+  if(state.era>=2){
+    if(state.city.includes("⛏")) state.ore++;
+    if(state.city.includes("🔥") && state.ore>=5){
+      state.ore-=5;
+      state.bronze++;
+    }
+    render();
   }
-  if (state.era === 2) {
-    decisions.push(`<button onclick="buildMine()">⛏ Mine (40 tools)</button>`);
-    decisions.push(`<button onclick="buildSmelter()">🔥 Smelter (60 tools + 10 ore)</button>`);
-    decisions.push(`<button onclick="buildCouncil()">🏛 Council (30 tools)</button>`);
-  }
+},8000);
 
-  document.getElementById("decisions").innerHTML = decisions.join("");
-
-  document.getElementById("slots").innerHTML =
-    Array.from({ length: typeof era.slots === "function" ? era.slots() : era.slots })
-      .map((_, i) => `<div class="slot">${state.slotsUsed[i] || ""}</div>`)
-      .join("");
-
-  document.getElementById("log").innerHTML =
-    state.log.map(l => `<div>• ${l}</div>`).join("");
-
-  const cdLeft = Math.max(0, era.cooldown - (Date.now() - state.lastAction));
-  document.getElementById("cooldownText").innerText =
-    cdLeft > 0 ? `Cooldown: ${(cdLeft / 1000).toFixed(1)}s` : "";
-}
-
+/* ---------- INIT ---------- */
+const objectivesDiv=document.getElementById("objectives");
 render();
 </script>
-
 </body>
 </html>
