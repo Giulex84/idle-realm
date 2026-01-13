@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Idle Realm</title>
 
@@ -21,13 +21,11 @@ header{
   font-weight:600;
 }
 main{padding:16px;}
-h1{margin:10px 0 4px;}
 .card{
   background:rgba(255,255,255,.05);
   border-radius:16px;
   padding:14px;
   margin-bottom:16px;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
 }
 .buttons{display:flex;flex-wrap:wrap;gap:10px;}
 button{
@@ -41,16 +39,10 @@ button{
   background:#2563eb;
   color:#fff;
 }
-button.locked{
-  background:#334155;
-}
-small{opacity:.7}
-.city{
-  font-family:monospace;
-  font-size:18px;
-  letter-spacing:2px;
-}
+button.locked{background:#334155;}
+.city{font-family:monospace;font-size:18px;letter-spacing:2px;}
 .log{font-size:14px;padding-left:18px;}
+small{opacity:.7}
 </style>
 </head>
 
@@ -70,11 +62,11 @@ small{opacity:.7}
 <div class="card">
 <h2>Build</h2>
 <div class="buttons">
-  <button id="settlementBtn">🏠 Settlement</button>
-  <button id="workshopBtn">⚒️ Workshop</button>
-  <button id="councilBtn">🏛️ Council</button>
+  <button id="sBtn">🏠 Settlement</button>
+  <button id="wBtn">⚒️ Workshop</button>
+  <button id="cBtn">🏛️ Council</button>
 </div>
-<p id="hint"><small></small></p>
+<p id="hint"></p>
 </div>
 
 <div class="card">
@@ -95,63 +87,69 @@ Government: <span id="gov"></span>
 <h2>Events</h2>
 <ul id="log" class="log"></ul>
 </div>
-
 </main>
 
 <script>
-/* ================= STATE ================= */
-let S = JSON.parse(localStorage.getItem("idleRealm")) || {
-  pop:10, prod:10, stab:100,
-  s:0, w:0, c:0,
-  era:0, tick:0
+/* ========= STATE LOAD + MIGRATION ========= */
+function safe(n, d){ return Number.isFinite(n) ? n : d; }
+
+let raw = JSON.parse(localStorage.getItem("idleRealm")) || {};
+
+let S = {
+  pop: safe(raw.pop, 10),
+  prod: safe(raw.prod, 10),
+  stab: safe(raw.stab, 100),
+  s: safe(raw.s, 0),
+  w: safe(raw.w, 0),
+  c: safe(raw.c, 0),
+  era: safe(raw.era, 0),
+  tick: safe(raw.tick, 0)
 };
 
-const ERAS=[
-  {name:"Foundations",desc:"Slow growth. Every choice matters.",popCap:120},
-  {name:"Expansion",desc:"Growth accelerates. Stability becomes critical.",popCap:600}
+const ERAS = [
+  {name:"Foundations", desc:"Slow growth. Every choice matters.", popCap:120},
+  {name:"Expansion", desc:"Growth accelerates. Stability is fragile.", popCap:600}
 ];
 
-/* ================= HELPERS ================= */
-const $=id=>document.getElementById(id);
-const log=msg=>{
+const $ = id => document.getElementById(id);
+const log = m => {
   const li=document.createElement("li");
-  li.textContent=msg;
+  li.textContent=m;
   $("log").prepend(li);
 };
-const save=()=>localStorage.setItem("idleRealm",JSON.stringify(S));
+const save = () => localStorage.setItem("idleRealm", JSON.stringify(S));
 
-function cost(base, count){ return Math.floor(base*(1+count*0.35)); }
+function cost(base,count){ return Math.floor(base * (1 + count * 0.35)); }
 
-/* ================= ACTIONS ================= */
+/* ========= ACTIONS ========= */
 function build(type){
   if(type==="s"){
-    const pCost=cost(8,S.s), stabCost=8;
-    if(S.prod<pCost) return log("Not enough production");
-    if(S.stab<stabCost) return log("Stability too low");
-    S.prod-=pCost; S.pop+=4; S.stab-=stabCost; S.s++;
-    log(`Settlement built (+4 pop, -${stabCost} stab)`);
+    const p=cost(8,S.s), stab=8;
+    if(S.prod<p) return log("Not enough production");
+    if(S.stab<stab) return log("Stability too low");
+    S.prod-=p; S.pop+=4; S.stab-=stab; S.s++;
+    log("Settlement built (+4 pop, -8 stab)");
   }
   if(type==="w"){
-    const pCost=cost(12,S.w), stabCost=12;
-    if(S.prod<pCost) return log("Not enough production");
-    if(S.stab<stabCost) return log("Stability too low");
-    S.prod-=pCost; S.prod+=2; S.stab-=stabCost; S.w++;
-    log(`Workshop built (+2 prod, -${stabCost} stab)`);
+    const p=cost(12,S.w), stab=12;
+    if(S.prod<p) return log("Not enough production");
+    if(S.stab<stab) return log("Stability too low");
+    S.prod-=p; S.prod+=2; S.stab-=stab; S.w++;
+    log("Workshop built (+2 prod, -12 stab)");
   }
   if(type==="c"){
-    const pCost=25;
     if(S.c>=1) return log("Only one Council allowed");
-    if(S.prod<pCost) return log("Not enough production");
-    S.prod-=pCost; S.stab+=20; S.c=1;
+    if(S.prod<25) return log("Not enough production");
+    S.prod-=25; S.stab+=20; S.c=1;
     log("Council built (+20 stability)");
   }
 }
 
-/* ================= UI ================= */
+/* ========= UI ========= */
 function update(){
   $("pop").textContent=S.pop.toFixed(1);
   $("prod").textContent=S.prod.toFixed(1);
-  $("stab").textContent=S.stab.toFixed(0);
+  $("stab").textContent=Math.max(0,Math.min(100,S.stab)).toFixed(0);
   $("era").textContent=ERAS[S.era].name;
   $("eraDesc").textContent=ERAS[S.era].desc;
 
@@ -159,20 +157,19 @@ function update(){
   $("ind").textContent="■".repeat(S.w);
   $("gov").textContent=S.c?"■":"";
 
-  // hints
-  $("hint").innerHTML=
-    `Settlement cost: ${cost(8,S.s)} prod<br/>
-     Workshop cost: ${cost(12,S.w)} prod`;
+  $("hint").innerHTML =
+    `<small>Settlement: ${cost(8,S.s)} prod<br/>
+     Workshop: ${cost(12,S.w)} prod</small>`;
 
   save();
 }
 
-/* ================= LOOP ================= */
+/* ========= LOOP ========= */
 setInterval(()=>{
   S.tick++;
-  S.prod+=S.w*0.4;
-  S.pop=Math.min(S.pop+S.s*0.2,ERAS[S.era].popCap);
-  S.stab=Math.min(100,S.stab+0.15);
+  S.prod += S.w * 0.4;
+  S.pop = Math.min(S.pop + S.s * 0.2, ERAS[S.era].popCap);
+  S.stab = Math.min(100, S.stab + 0.15);
 
   if(S.era===0 && S.pop>80 && S.s>=3){
     S.era=1;
@@ -181,10 +178,10 @@ setInterval(()=>{
   update();
 },1000);
 
-/* ================= BINDINGS ================= */
-$("settlementBtn").onclick=()=>build("s");
-$("workshopBtn").onclick=()=>build("w");
-$("councilBtn").onclick=()=>build("c");
+/* ========= BIND ========= */
+$("sBtn").onclick=()=>build("s");
+$("wBtn").onclick=()=>build("w");
+$("cBtn").onclick=()=>build("c");
 
 update();
 </script>
