@@ -22,7 +22,6 @@ header{
 .container{padding:16px;max-width:420px;margin:auto}
 h1{margin:8px 0 0;font-size:30px}
 .subtitle{opacity:.7;margin-bottom:16px}
-
 .card{
   background:rgba(255,255,255,.06);
   border-radius:16px;
@@ -40,7 +39,6 @@ button{
   color:white;
 }
 button:disabled{opacity:.4}
-
 .grid{
   display:grid;
   grid-template-columns:repeat(3,1fr);
@@ -57,6 +55,9 @@ button:disabled{opacity:.4}
 }
 .log{font-size:14px;opacity:.85}
 .cooldown{color:#facc15;font-weight:600}
+.objective{font-size:14px}
+.objective.done{color:#22c55e}
+.locked{opacity:.5}
 </style>
 </head>
 
@@ -89,6 +90,7 @@ button:disabled{opacity:.4}
 <div class="card">
 <h2>Era</h2>
 <div id="eraText"></div>
+<div id="objectives"></div>
 </div>
 
 <div class="card">
@@ -103,21 +105,40 @@ button:disabled{opacity:.4}
 </div>
 
 <script>
-/* ===== STATE ===== */
-let era = 1; // 1=Clans, 2=Bronze
-let population = 10;
-let production = 30;
-let stability = 100;
-let time = 0;
+/* ================= STATE ================= */
+let S = {
+  era: 1,
+  population: 10,
+  production: 30,
+  totalProduction: 0,
+  stability: 100,
+  time: 0,
 
-let settlements=0, workshops=0, council=false;
-let citySize = 9;
-let city = Array(citySize).fill(null);
+  settlements: 0,
+  workshops: 0,
+  council: false,
 
-let cooldown = 0;
-let COOLDOWN_MAX = 8;
+  citySize: 9,
+  city: Array(9).fill(null),
 
-/* ===== TEXT ===== */
+  cooldown: 0,
+  cooldownMax: 8
+};
+
+/* ================= PERSISTENCE ================= */
+const SAVE_KEY = "idle_realm_save";
+
+function saveGame(){
+  localStorage.setItem(SAVE_KEY, JSON.stringify(S));
+}
+function loadGame(){
+  const data = localStorage.getItem(SAVE_KEY);
+  if(data){
+    S = JSON.parse(data);
+  }
+}
+
+/* ================= TEXT ================= */
 const chronicles = {
   1:[
     "Small clans gather around fire and stone.",
@@ -131,131 +152,150 @@ const chronicles = {
   ]
 };
 
-/* ===== HELPERS ===== */
-const $=id=>document.getElementById(id);
-const log=t=>$("events").innerHTML="• "+t+"<br>"+$("events").innerHTML;
+let chronicleIndex = 0;
 
+/* ================= HELPERS ================= */
+const $=id=>document.getElementById(id);
+const log=t=>{$("events").innerHTML="• "+t+"<br>"+$("events").innerHTML;}
+function emptySlot(){return S.city.findIndex(t=>t===null);}
+
+/* ================= UI ================= */
 function renderCity(){
   $("city").innerHTML="";
-  city.forEach(t=>{
+  S.city.forEach(t=>{
     const d=document.createElement("div");
     d.className="tile";
     d.textContent=t||"";
     $("city").appendChild(d);
   });
 }
-function emptySlot(){return city.findIndex(t=>t===null);}
 
-/* ===== UI ===== */
+function updateChronicle(){
+  const arr=chronicles[S.era];
+  $("chronicle").textContent=arr[chronicleIndex];
+  chronicleIndex=(chronicleIndex+1)%arr.length;
+}
+
+function updateObjectives(){
+  let html="";
+  if(S.era===1){
+    const o1 = S.settlements + S.workshops + (S.council?1:0) >= 5 && S.workshops>=1;
+    const o2 = S.population>=35 && S.stability>=60;
+    const o3 = S.totalProduction>=100;
+
+    html += `<div class="objective ${o1?'done':''}">• Build 5 buildings (1 Workshop)</div>`;
+    html += `<div class="objective ${o2?'done':''}">• Reach 35 population (60% stability)</div>`;
+    html += `<div class="objective ${o3?'done':''}">• Accumulate 100 production</div>`;
+
+    if(o1 && o2 && o3){
+      advanceEra();
+    }
+  }
+  $("objectives").innerHTML=html;
+}
+
 function updateUI(){
-  $("pop").textContent=population.toFixed(1);
-  $("prod").textContent=production.toFixed(1);
-  $("stab").textContent=Math.max(0,Math.min(100,stability)).toFixed(0);
-  $("time").textContent=time;
+  $("pop").textContent=S.population.toFixed(1);
+  $("prod").textContent=S.production.toFixed(1);
+  $("stab").textContent=Math.max(0,Math.min(100,S.stability)).toFixed(0);
+  $("time").textContent=S.time;
 
   $("bSettlement").disabled=!canBuild("settlement");
   $("bWorkshop").disabled=!canBuild("workshop");
   $("bCouncil").disabled=!canBuild("council");
 
-  $("cooldown").textContent=
-    cooldown>0?`Cooldown: ${cooldown}s`:"";
+  $("cooldown").textContent=S.cooldown>0?`Cooldown: ${S.cooldown}s`:"";
 
-  $("eraText").innerHTML =
-    era===1
+  $("eraText").innerHTML=
+    S.era===1
     ? "<b>Age of Clans</b><br>Fast growth. Learning phase."
     : "<b>Age of Bronze</b><br>Slower progress. Strategic depth.";
+
+  renderCity();
+  updateObjectives();
 }
 
-/* ===== ECONOMY (ERA BASED) ===== */
-function productionPerSecond(){
-  if(era===1){
-    return 0.2 + workshops*0.6;
+/* ================= ECONOMY ================= */
+function prodPerSecond(){
+  if(S.era===1){
+    return 0.2 + S.workshops*0.6;
   }
-  // ERA 2 slower
-  return 0.1 + Math.pow(workshops,0.8)*0.5;
+  return 0.1 + Math.pow(S.workshops,0.8)*0.5;
 }
 
-/* ===== BUILD RULES ===== */
+/* ================= BUILD ================= */
 function canBuild(type){
-  if(cooldown>0) return false;
+  if(S.cooldown>0) return false;
   if(emptySlot()<0) return false;
 
-  if(type==="settlement") return production>=15;
-  if(type==="workshop") return production>=20;
-  if(type==="council") return production>=30 && !council;
+  if(type==="settlement") return S.production>=15;
+  if(type==="workshop") return S.production>=20;
+  if(type==="council") return S.production>=30 && !S.council;
   return false;
 }
 
 function build(type){
   if(!canBuild(type)) return;
   const slot=emptySlot();
-  cooldown=COOLDOWN_MAX;
+  S.cooldown=S.cooldownMax;
 
   if(type==="settlement"){
-    production-=15;
-    population+= era===1 ? 4 : 2;
-    stability-=6;
-    settlements++;
-    city[slot]="🏠";
+    S.production-=15;
+    S.population+=S.era===1?4:2;
+    S.stability-=6;
+    S.settlements++;
+    S.city[slot]="🏠";
     log("Settlement expands population");
   }
-
   if(type==="workshop"){
-    production-=20;
-    workshops++;
-    stability-=4;
-    city[slot]="🛠";
+    S.production-=20;
+    S.workshops++;
+    S.stability-=4;
+    S.city[slot]="🛠";
     log("Workshop improves production");
   }
-
   if(type==="council"){
-    production-=30;
-    stability+=20;
-    council=true;
-    city[slot]="🏛";
+    S.production-=30;
+    S.stability+=20;
+    S.council=true;
+    S.city[slot]="🏛";
     log("Council brings order");
   }
-
-  checkEraTransition();
+  saveGame();
   updateUI();
-  renderCity();
 }
 
-/* ===== ERA TRANSITION ===== */
-function checkEraTransition(){
-  if(era===1 && city.every(t=>t!==null) && stability>=60){
-    era=2;
-    citySize=12;
-    city.push(null,null,null);
-    COOLDOWN_MAX=12;
-    log("⚔️ The Age of Bronze begins!");
-    updateChronicle();
-  }
+/* ================= ERA TRANSITION ================= */
+function advanceEra(){
+  if(S.era!==1) return;
+  S.era=2;
+  S.citySize=12;
+  S.city.push(null,null,null);
+  S.cooldownMax=12;
+  log("⚔️ The Age of Bronze begins!");
+  updateChronicle();
+  saveGame();
 }
 
-/* ===== CHRONICLE ===== */
-let chronicleIndex=0;
-function updateChronicle(){
-  const arr=chronicles[era];
-  $("chronicle").textContent=arr[chronicleIndex];
-  chronicleIndex=(chronicleIndex+1)%arr.length;
-}
-
-/* ===== BUTTONS ===== */
+/* ================= BUTTONS ================= */
 bSettlement.onclick=()=>build("settlement");
 bWorkshop.onclick=()=>build("workshop");
 bCouncil.onclick=()=>build("council");
 
-/* ===== TICK ===== */
+/* ================= TICK ================= */
 setInterval(()=>{
-  time++;
-  production+=productionPerSecond();
-  if(cooldown>0) cooldown--;
-  if(time%10===0) updateChronicle();
+  S.time++;
+  const p=prodPerSecond();
+  S.production+=p;
+  S.totalProduction+=p;
+  if(S.cooldown>0) S.cooldown--;
+  if(S.time%10===0) updateChronicle();
+  saveGame();
   updateUI();
-  renderCity();
 },1000);
 
+/* ================= INIT ================= */
+loadGame();
 updateChronicle();
 updateUI();
 renderCity();
