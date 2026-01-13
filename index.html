@@ -1,190 +1,279 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Idle Realm</title>
 
 <style>
-body{
-  margin:0;
-  font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
-  background:radial-gradient(circle at top,#0b1a33,#050914);
-  color:#e8eefc;
+:root {
+  --bg: #070d1a;
+  --panel: rgba(255,255,255,0.05);
+  --accent: #3b82f6;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --danger: #ef4444;
 }
-header{
-  display:flex;
-  justify-content:space-around;
-  padding:12px;
-  background:rgba(0,0,0,.45);
-  backdrop-filter:blur(6px);
-  font-weight:600;
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: radial-gradient(circle at top, #0b1430, var(--bg));
+  color: var(--text);
 }
-main{padding:16px;}
-.card{
-  background:rgba(255,255,255,.05);
-  border-radius:16px;
-  padding:14px;
-  margin-bottom:16px;
+
+.container {
+  padding: 16px;
+  max-width: 420px;
+  margin: auto;
 }
-.buttons{display:flex;flex-wrap:wrap;gap:10px;}
-button{
-  flex:1;
-  min-width:140px;
-  padding:14px;
-  border-radius:12px;
-  border:none;
-  font-size:15px;
-  font-weight:600;
-  background:#2563eb;
-  color:#fff;
+
+/* TOP BAR */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
 }
-button.locked{background:#334155;}
-.city{font-family:monospace;font-size:18px;letter-spacing:2px;}
-.log{font-size:14px;padding-left:18px;}
-small{opacity:.7}
+.topbar span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* PANELS */
+.panel {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(10px);
+}
+
+h1 {
+  margin: 8px 0 4px;
+  font-size: 28px;
+}
+.subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+h2 {
+  margin: 0 0 12px;
+}
+
+/* BUTTONS */
+.buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+button {
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+}
+button:disabled {
+  background: #1f2937;
+  color: var(--muted);
+}
+
+/* CITY GRID */
+.city-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  font-size: 28px;
+  text-align: center;
+}
+.tile {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+}
+
+/* EVENTS */
+.events {
+  font-size: 13px;
+  color: var(--muted);
+}
+.events div {
+  margin-bottom: 4px;
+}
+
+/* ERA */
+.era {
+  font-size: 14px;
+  color: var(--muted);
+}
 </style>
 </head>
 
 <body>
+<div class="container">
 
-<header>
-  <div>👥 <span id="pop">0</span></div>
-  <div>⚒️ <span id="prod">0</span></div>
-  <div>🛡️ <span id="stab">0</span>%</div>
-  <div>⏳ <span id="era">Foundations</span></div>
-</header>
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <span>👥 <span id="pop">10</span></span>
+    <span>⚒️ <span id="prod">10</span></span>
+    <span>🛡️ <span id="stab">100</span>%</span>
+    <span>⏳ <span id="tick">0</span></span>
+  </div>
 
-<main>
-<h1>Idle Realm</h1>
-<small>A living world shaped by time and choices</small>
+  <h1>Idle Realm</h1>
+  <div class="subtitle">A living world shaped by time and choices</div>
 
-<div class="card">
-<h2>Build</h2>
-<div class="buttons">
-  <button id="sBtn">🏠 Settlement</button>
-  <button id="wBtn">⚒️ Workshop</button>
-  <button id="cBtn">🏛️ Council</button>
-</div>
-<p id="hint"></p>
-</div>
+  <!-- BUILD -->
+  <div class="panel">
+    <h2>Build</h2>
+    <div class="buttons">
+      <button id="btnSettlement">🏠 Settlement</button>
+      <button id="btnWorkshop">⚒️ Workshop</button>
+      <button id="btnCouncil">🏛️ Council</button>
+    </div>
+    <div class="era" style="margin-top:8px;">
+      Settlement cost: <span id="costSet">10</span> prod<br>
+      Workshop cost: <span id="costWork">15</span> prod
+    </div>
+  </div>
 
-<div class="card">
-<h2>City</h2>
-<div class="city">
-Residential: <span id="res"></span><br/>
-Industrial: <span id="ind"></span><br/>
-Government: <span id="gov"></span>
-</div>
-</div>
+  <!-- CITY -->
+  <div class="panel">
+    <h2>City</h2>
+    <div class="city-grid" id="city">
+      <div class="tile">⬜</div>
+      <div class="tile">⬜</div>
+      <div class="tile">⬜</div>
+      <div class="tile">⬜</div>
+      <div class="tile">⬜</div>
+      <div class="tile">⬜</div>
+      <div class="tile">⬜</div>
+      <div class="tile">⬜</div>
+      <div class="tile">⬜</div>
+    </div>
+  </div>
 
-<div class="card">
-<h2>Era</h2>
-<p id="eraDesc"></p>
-</div>
+  <!-- ERA -->
+  <div class="panel">
+    <h2>Era</h2>
+    <div class="era">
+      Foundations — slow growth. Every choice matters.
+    </div>
+  </div>
 
-<div class="card">
-<h2>Events</h2>
-<ul id="log" class="log"></ul>
+  <!-- EVENTS -->
+  <div class="panel">
+    <h2>Events</h2>
+    <div class="events" id="events"></div>
+  </div>
+
 </div>
-</main>
 
 <script>
-/* ========= STATE LOAD + MIGRATION ========= */
-function safe(n, d){ return Number.isFinite(n) ? n : d; }
+/* GAME STATE */
+let pop = 10;
+let prod = 10;
+let stab = 100;
+let ticks = 0;
 
-let raw = JSON.parse(localStorage.getItem("idleRealm")) || {};
+let settlements = 0;
+let workshops = 0;
+let councilBuilt = false;
 
-let S = {
-  pop: safe(raw.pop, 10),
-  prod: safe(raw.prod, 10),
-  stab: safe(raw.stab, 100),
-  s: safe(raw.s, 0),
-  w: safe(raw.w, 0),
-  c: safe(raw.c, 0),
-  era: safe(raw.era, 0),
-  tick: safe(raw.tick, 0)
-};
+const maxTiles = 9;
 
-const ERAS = [
-  {name:"Foundations", desc:"Slow growth. Every choice matters.", popCap:120},
-  {name:"Expansion", desc:"Growth accelerates. Stability is fragile.", popCap:600}
-];
-
+/* HELPERS */
 const $ = id => document.getElementById(id);
-const log = m => {
-  const li=document.createElement("li");
-  li.textContent=m;
-  $("log").prepend(li);
-};
-const save = () => localStorage.setItem("idleRealm", JSON.stringify(S));
-
-function cost(base,count){ return Math.floor(base * (1 + count * 0.35)); }
-
-/* ========= ACTIONS ========= */
-function build(type){
-  if(type==="s"){
-    const p=cost(8,S.s), stab=8;
-    if(S.prod<p) return log("Not enough production");
-    if(S.stab<stab) return log("Stability too low");
-    S.prod-=p; S.pop+=4; S.stab-=stab; S.s++;
-    log("Settlement built (+4 pop, -8 stab)");
-  }
-  if(type==="w"){
-    const p=cost(12,S.w), stab=12;
-    if(S.prod<p) return log("Not enough production");
-    if(S.stab<stab) return log("Stability too low");
-    S.prod-=p; S.prod+=2; S.stab-=stab; S.w++;
-    log("Workshop built (+2 prod, -12 stab)");
-  }
-  if(type==="c"){
-    if(S.c>=1) return log("Only one Council allowed");
-    if(S.prod<25) return log("Not enough production");
-    S.prod-=25; S.stab+=20; S.c=1;
-    log("Council built (+20 stability)");
-  }
+function log(msg) {
+  const e = $("events");
+  e.innerHTML = `<div>• ${msg}</div>` + e.innerHTML;
+  e.innerHTML = e.innerHTML.split("</div>").slice(0,9).join("</div>");
 }
 
-/* ========= UI ========= */
-function update(){
-  $("pop").textContent=S.pop.toFixed(1);
-  $("prod").textContent=S.prod.toFixed(1);
-  $("stab").textContent=Math.max(0,Math.min(100,S.stab)).toFixed(0);
-  $("era").textContent=ERAS[S.era].name;
-  $("eraDesc").textContent=ERAS[S.era].desc;
+/* COSTS */
+function settlementCost() { return 10 + settlements * 5; }
+function workshopCost() { return 15 + workshops * 8; }
 
-  $("res").textContent="■".repeat(S.s);
-  $("ind").textContent="■".repeat(S.w);
-  $("gov").textContent=S.c?"■":"";
+/* UI UPDATE */
+function update() {
+  $("pop").textContent = pop.toFixed(1);
+  $("prod").textContent = prod.toFixed(1);
+  $("stab").textContent = Math.max(0, Math.min(100, stab)).toFixed(0);
+  $("tick").textContent = ticks;
 
-  $("hint").innerHTML =
-    `<small>Settlement: ${cost(8,S.s)} prod<br/>
-     Workshop: ${cost(12,S.w)} prod</small>`;
+  $("costSet").textContent = settlementCost();
+  $("costWork").textContent = workshopCost();
 
-  save();
+  $("btnSettlement").disabled = prod < settlementCost() || settlements + workshops + (councilBuilt?1:0) >= maxTiles;
+  $("btnWorkshop").disabled = prod < workshopCost() || settlements + workshops + (councilBuilt?1:0) >= maxTiles;
+  $("btnCouncil").disabled = councilBuilt || prod < 20;
 }
 
-/* ========= LOOP ========= */
-setInterval(()=>{
-  S.tick++;
-  S.prod += S.w * 0.4;
-  S.pop = Math.min(S.pop + S.s * 0.2, ERAS[S.era].popCap);
-  S.stab = Math.min(100, S.stab + 0.15);
-
-  if(S.era===0 && S.pop>80 && S.s>=3){
-    S.era=1;
-    log("⚡ Era advanced: Expansion");
+/* BUILD ACTIONS */
+function place(icon) {
+  const tiles = document.querySelectorAll(".tile");
+  for (let t of tiles) {
+    if (t.textContent === "⬜") {
+      t.textContent = icon;
+      return true;
+    }
   }
+  return false;
+}
+
+$("btnSettlement").onclick = () => {
+  if (prod < settlementCost()) return log("Not enough production");
+  if (!place("🏠")) return;
+  prod -= settlementCost();
+  settlements++;
+  pop += 4;
+  stab -= 8;
+  log("Settlement built (+4 pop, -8 stab)");
   update();
-},1000);
+};
 
-/* ========= BIND ========= */
-$("sBtn").onclick=()=>build("s");
-$("wBtn").onclick=()=>build("w");
-$("cBtn").onclick=()=>build("c");
+$("btnWorkshop").onclick = () => {
+  if (prod < workshopCost()) return log("Not enough production");
+  if (!place("⚒️")) return;
+  prod -= workshopCost();
+  workshops++;
+  prod += 2;
+  stab -= 12;
+  log("Workshop built (+2 prod, -12 stab)");
+  update();
+};
+
+$("btnCouncil").onclick = () => {
+  if (councilBuilt) return log("Only one Council allowed");
+  if (prod < 20) return log("Not enough production");
+  if (!place("🏛️")) return;
+  prod -= 20;
+  stab += 20;
+  councilBuilt = true;
+  log("Council built (+20 stability)");
+  update();
+};
+
+/* IDLE TICK */
+setInterval(() => {
+  ticks++;
+  prod += workshops * 0.5;
+  pop += settlements * 0.05;
+  stab += councilBuilt ? 0.2 : -0.1;
+  stab = Math.max(0, Math.min(100, stab));
+  update();
+}, 1000);
 
 update();
 </script>
-
 </body>
 </html>
