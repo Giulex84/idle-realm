@@ -11,30 +11,23 @@
   --card:#141c33;
   --card2:#1b2546;
   --accent:#2f6bff;
-  --bronze:#c27c2c;
   --text:#e6ecff;
   --muted:#9aa4c7;
   --ok:#22c55e;
+  --warn:#f59e0b;
 }
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
 body{margin:0;background:linear-gradient(180deg,#0a1020,#050a14);color:var(--text)}
-header{
-  position:sticky;top:0;z-index:10;
-  background:#060b18;
-  padding:8px 12px;
-  display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;
-  font-size:14px;
-}
+header{position:sticky;top:0;background:#060b18;padding:8px 12px;display:flex;justify-content:space-between;font-size:14px}
 main{padding:16px;max-width:500px;margin:auto}
 .card{background:linear-gradient(180deg,var(--card),var(--card2));border-radius:16px;padding:16px;margin-bottom:16px}
-button{width:100%;border:none;border-radius:14px;padding:14px;margin-bottom:10px;background:var(--accent);color:white;font-size:16px}
+button{width:100%;border:none;border-radius:14px;padding:14px;margin-bottom:8px;background:var(--accent);color:white;font-size:15px}
 button:disabled{opacity:.4}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .tile{background:#0f1730;border-radius:12px;height:70px;display:flex;align-items:center;justify-content:center;font-size:28px}
-.small{font-size:13px;color:var(--muted)}
-.obj{font-size:14px;margin-bottom:4px}
 .obj.ok{color:var(--ok)}
-.notice{background:#0f1730;padding:10px;border-radius:12px;font-size:13px;margin-bottom:12px}
+.obj.warn{color:var(--warn)}
+.small{font-size:13px;color:var(--muted)}
 </style>
 </head>
 
@@ -45,29 +38,24 @@ button:disabled{opacity:.4}
   <span>⚒️ <b id="prod"></b></span>
   <span>🥉 <b id="bronze"></b></span>
   <span>🛡️ <b id="stab"></b>%</span>
-  <span>⏳ <b id="time"></b></span>
 </header>
 
 <main>
 <h1>Idle Realm</h1>
-<div class="small">A living world shaped by time and choices</div>
-
-<div id="offlineNotice"></div>
+<div class="small">The Bronze Age demands balance.</div>
 
 <div class="card">
-  <h2>Era</h2>
-  <div><b>Bronze Age</b></div>
-  <div class="small" style="margin-bottom:8px">
-    Expansion slows. Infrastructure must adapt.
-  </div>
+  <h2>Era — Bronze Age</h2>
   <div id="objectives"></div>
 </div>
 
 <div class="card">
   <h2>Build</h2>
-  <button id="btnMine">⛏️ Mine</button>
-  <button id="btnSmelter">🔥 Smelter</button>
-  <div class="small" id="info"></div>
+  <button onclick="build('settlement')">🏠 Settlement (40)</button>
+  <button onclick="build('workshop')">⚒️ Workshop (60)</button>
+  <button onclick="build('council')">🏛️ Council (80)</button>
+  <button onclick="build('mine')">⛏️ Mine (70)</button>
+  <button onclick="build('smelter')">🔥 Smelter (90)</button>
 </div>
 
 <div class="card">
@@ -75,176 +63,66 @@ button:disabled{opacity:.4}
   <div class="grid" id="city"></div>
 </div>
 
-<div class="card">
-  <h2>Events</h2>
-  <div id="events"></div>
-</div>
-</main>
-
 <script>
-/* ===== CONFIG ===== */
-const MAX_SLOTS = 9;
-const COOLDOWN = 10;
-const WORKSHOP_PROD = 0.12;
-const BRONZE_RATE = 0.04;
-const OFFLINE_CAP = 600;
+const MAX=9;
+const COST={settlement:40,workshop:60,council:80,mine:70,smelter:90};
+const UPKEEP={workshop:0.03,mine:0.05,smelter:0.08};
 
-const COST = { mine: 60, smelter: 80 };
-
-const DEFAULT = {
-  era: "bronze",
-  pop: 24,
-  prod: 80,
-  bronze: 0,
-  stab: 90,
-  time: 0,
-  lastAction: 0,
-  lastSeen: Date.now(),
-  bronzeInitialized: false,
-  buildings: [],
-  events: []
+let s=JSON.parse(localStorage.getItem("idleRealm2"))||{
+  pop:24,prod:50,bronze:0,stab:90,
+  buildings:["⚒️","🏠","🏠","🏛️"]
 };
 
-let state = loadState();
+function save(){localStorage.setItem("idleRealm2",JSON.stringify(s));}
 
-/* ===== LOAD / SAVE ===== */
-function loadState(){
-  try{
-    const s = JSON.parse(localStorage.getItem("idleRealm"));
-    if(!s) return structuredClone(DEFAULT);
-    return Object.assign(structuredClone(DEFAULT), s);
-  }catch{
-    return structuredClone(DEFAULT);
-  }
-}
-function save(){
-  state.lastSeen = Date.now();
-  localStorage.setItem("idleRealm", JSON.stringify(state));
-}
-function log(msg){
-  state.events.unshift("• " + msg);
-  state.events = state.events.slice(0,10);
+function build(t){
+  if(s.prod<COST[t]||s.buildings.length>=MAX)return;
+  s.prod-=COST[t];
+  const icon={settlement:"🏠",workshop:"⚒️",council:"🏛️",mine:"⛏️",smelter:"🔥"}[t];
+  s.buildings.push(icon);
+  save();update();
 }
 
-/* ===== ERA MIGRATION (CRITICA) ===== */
-function initBronzeIfNeeded(){
-  if(state.bronzeInitialized) return;
-
-  // keep only core buildings
-  const kept = [];
-  state.buildings.forEach(b=>{
-    if(["⚒️","🏠","🏛️"].includes(b) && kept.length < 6){
-      kept.push(b);
-    }
-  });
-
-  state.buildings = kept;
-  state.prod = Math.min(state.prod, 100);
-  state.bronze = 0;
-  state.stab = Math.max(state.stab, 85);
-  state.events.unshift("• The realm reorganizes for metallurgy");
-
-  state.bronzeInitialized = true;
-}
-
-/* ===== OFFLINE ===== */
-(function(){
-  initBronzeIfNeeded();
-
-  const elapsed = Math.floor((Date.now() - state.lastSeen)/1000);
-  if(elapsed < 5) return;
-
-  const workshops = state.buildings.filter(b=>b==="⚒️").length;
-  const effective = Math.min(elapsed, OFFLINE_CAP);
-  const gain = workshops * WORKSHOP_PROD * effective;
-
-  state.prod += gain;
-
-  offlineNotice.innerHTML = `
-    <div class="notice">
-      ⏳ While you were away:<br>
-      +${gain.toFixed(1)} Production (${Math.floor(effective/60)} min)
-    </div>
-  `;
-})();
-
-/* ===== OBJECTIVES ===== */
-function eraObjectives(){
-  return [
-    ["Build 1 Mine", state.buildings.includes("⛏️")],
-    ["Build 1 Smelter", state.buildings.includes("🔥")],
-    ["Produce 50 Bronze", state.bronze >= 50],
-    ["Maintain Stability ≥ 80%", state.stab >= 80]
-  ];
-}
-
-/* ===== UPDATE ===== */
 function update(){
-  pop.innerText = state.pop.toFixed(0);
-  prod.innerText = state.prod.toFixed(1);
-  bronze.innerText = state.bronze.toFixed(1);
-  stab.innerText = Math.max(0,Math.min(100,state.stab)).toFixed(0);
-  time.innerText = state.time;
-
-  objectives.innerHTML="";
-  eraObjectives().forEach(o=>{
-    const d=document.createElement("div");
-    d.className="obj"+(o[1]?" ok":"");
-    d.innerText=(o[1]?"✔ ":"☐ ")+o[0];
-    objectives.appendChild(d);
-  });
-
-  btnMine.disabled = state.prod < COST.mine || state.buildings.length>=MAX_SLOTS;
-  btnSmelter.disabled = state.prod < COST.smelter || state.buildings.length>=MAX_SLOTS;
+  pop.textContent=s.pop;
+  prod.textContent=s.prod.toFixed(1);
+  bronze.textContent=s.bronze.toFixed(1);
+  stab.textContent=s.stab.toFixed(0);
 
   city.innerHTML="";
-  for(let i=0;i<MAX_SLOTS;i++){
-    const t=document.createElement("div");
-    t.className="tile";
-    t.innerText = state.buildings[i] || "⬜";
-    city.appendChild(t);
+  for(let i=0;i<MAX;i++){
+    const d=document.createElement("div");
+    d.className="tile";
+    d.textContent=s.buildings[i]||"⬜";
+    city.appendChild(d);
   }
 
-  events.innerHTML = state.events.map(e=>`<div>${e}</div>`).join("");
-  save();
+  objectives.innerHTML=`
+    <div class="obj ${s.bronze>=50?'ok':'warn'}">Produce 50 Bronze</div>
+    <div class="obj ${s.stab>=80?'ok':'warn'}">Maintain Stability ≥ 80%</div>
+  `;
 }
 
-/* ===== ACTIONS ===== */
-function build(type){
-  if(type==="mine"){
-    state.prod -= COST.mine;
-    state.buildings.push("⛏️");
-    log("Mine constructed");
-  }
-  if(type==="smelter"){
-    state.prod -= COST.smelter;
-    state.buildings.push("🔥");
-    log("Smelter constructed");
-  }
-  update();
-}
-
-/* ===== TICK ===== */
 setInterval(()=>{
-  state.time++;
+  const w=s.buildings.filter(b=>b==="⚒️").length;
+  const m=s.buildings.filter(b=>b==="⛏️").length;
+  const sm=s.buildings.filter(b=>b==="🔥").length;
 
-  const workshops = state.buildings.filter(b=>b==="⚒️").length;
-  const smelters = state.buildings.filter(b=>b==="🔥").length;
-
-  state.prod += workshops * WORKSHOP_PROD;
-
-  if(smelters && state.prod && state.stab>=80){
-    const c = Math.min(state.prod, smelters * BRONZE_RATE);
-    state.prod -= c;
-    state.bronze += c;
+  s.prod+=w*0.15;
+  if(sm>0&&s.prod>0){
+    const c=Math.min(s.prod,sm*0.05);
+    s.prod-=c;
+    s.bronze+=c;
   }
 
-  if(state.stab < 100) state.stab += 0.015;
-  update();
-},1000);
+  let drain=0;
+  if(w)drain+=w*UPKEEP.workshop;
+  if(m)drain+=m*UPKEEP.mine;
+  if(sm)drain+=sm*UPKEEP.smelter;
+  s.stab=Math.max(0,s.stab-drain);
 
-btnMine.onclick=()=>build("mine");
-btnSmelter.onclick=()=>build("smelter");
+  save();update();
+},1000);
 
 update();
 </script>
