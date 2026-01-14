@@ -36,7 +36,6 @@ button:disabled{opacity:.4}
 .small{font-size:13px;color:var(--muted)}
 .obj{font-size:14px;margin-bottom:4px}
 .obj.ok{color:var(--ok)}
-.obj.bad{color:var(--bad)}
 .notice{background:#0f1730;padding:10px;border-radius:12px;font-size:13px;margin-bottom:12px}
 </style>
 </head>
@@ -62,7 +61,9 @@ button:disabled{opacity:.4}
   <div id="eraTitle"></div>
   <div id="eraDesc" class="small" style="margin-bottom:8px"></div>
   <div id="objectives"></div>
-  <button id="advanceEra" class="bronze" style="display:none">🥉 Enter the Bronze Age</button>
+  <button id="advanceEra" class="bronze" style="display:none">
+    🥉 Enter the Bronze Age (50 ⚒️)
+  </button>
 </div>
 
 <div class="card">
@@ -91,6 +92,7 @@ const COOLDOWN=8;
 const BASE_OFFLINE_CAP_FOUNDATIONS=300;
 const BASE_OFFLINE_CAP_BRONZE=600;
 const COUNCIL_OFFLINE_BONUS=300;
+const ERA2_COST = 50;
 
 const COST={settlement:15,workshop:20,council:30};
 
@@ -188,7 +190,10 @@ function update(){
     objectives.appendChild(d);
   });
 
-  advanceEra.style.display=state.era==="foundations"&&foundationsComplete()?"block":"none";
+  advanceEra.style.display =
+    state.era==="foundations" && foundationsComplete() ? "block" : "none";
+
+  advanceEra.disabled = state.prod < ERA2_COST;
 
   const cd=Math.max(0,Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000));
   info.innerText=`Settlement ${COST.settlement} | Workshop ${COST.workshop} | Council ${COST.council}`+(canAct()?" • Ready":` • Cooldown ${cd}s`);
@@ -218,10 +223,18 @@ function build(type){
   state.lastAction=Date.now();
   update();
 }
+
 btnSettle.onclick=()=>build("settlement");
 btnWork.onclick=()=>build("workshop");
 btnCouncil.onclick=()=>build("council");
-advanceEra.onclick=()=>{state.era="bronze";log("The Bronze Age begins");update()};
+
+advanceEra.onclick=()=>{
+  if(state.prod < ERA2_COST) return;
+  state.prod -= ERA2_COST;
+  state.era="bronze";
+  log("The Bronze Age begins");
+  update();
+};
 
 /* ===== TICK ===== */
 setInterval(()=>{
