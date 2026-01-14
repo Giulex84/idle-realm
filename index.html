@@ -13,21 +13,69 @@
   --accent:#2f6bff;
   --text:#e6ecff;
   --muted:#9aa4c7;
-  --ok:#22c55e;
-  --warn:#f59e0b;
+  --good:#5dff9b;
+  --warn:#ffb84d;
 }
+
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
-body{margin:0;background:linear-gradient(180deg,#0a1020,#050a14);color:var(--text)}
-header{position:sticky;top:0;background:#060b18;padding:8px 12px;display:flex;justify-content:space-between;font-size:14px}
-main{padding:16px;max-width:500px;margin:auto}
-.card{background:linear-gradient(180deg,var(--card),var(--card2));border-radius:16px;padding:16px;margin-bottom:16px}
-button{width:100%;border:none;border-radius:14px;padding:14px;margin-bottom:8px;background:var(--accent);color:white;font-size:15px}
+
+body{
+  margin:0;
+  background:linear-gradient(180deg,#0a1020,#050a14);
+  color:var(--text);
+}
+
+header{
+  position:sticky;
+  top:0;
+  background:#060b18;
+  padding:8px 12px;
+  display:flex;
+  justify-content:space-between;
+  font-size:13px;
+  z-index:10;
+}
+
+main{padding:16px;max-width:520px;margin:auto}
+
+.card{
+  background:linear-gradient(180deg,var(--card),var(--card2));
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:16px;
+}
+
+button{
+  width:100%;
+  border:none;
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:10px;
+  background:var(--accent);
+  color:white;
+  font-size:16px;
+}
 button:disabled{opacity:.4}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.tile{background:#0f1730;border-radius:12px;height:70px;display:flex;align-items:center;justify-content:center;font-size:28px}
-.obj.ok{color:var(--ok)}
-.obj.warn{color:var(--warn)}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+
+.tile{
+  background:#0f1730;
+  border-radius:12px;
+  height:70px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:28px;
+}
+
 .small{font-size:13px;color:var(--muted)}
+.good{color:var(--good)}
+.warn{color:var(--warn)}
 </style>
 </head>
 
@@ -41,21 +89,28 @@ button:disabled{opacity:.4}
 </header>
 
 <main>
+
 <h1>Idle Realm</h1>
-<div class="small">The Bronze Age demands balance.</div>
+<div class="small">A living world shaped by time and choices</div>
 
 <div class="card">
   <h2>Era — Bronze Age</h2>
-  <div id="objectives"></div>
+  <div class="small">Expansion slows. Infrastructure must adapt.</div>
+  <div style="margin-top:8px">
+    <div id="objMine">⬜ Build 1 Mine</div>
+    <div id="objSmelter">⬜ Build 1 Smelter</div>
+    <div id="objBronze">⬜ Produce 50 Bronze</div>
+    <div id="objStab">⬜ Maintain Stability ≥ 80%</div>
+  </div>
 </div>
 
 <div class="card">
   <h2>Build</h2>
-  <button onclick="build('settlement')">🏠 Settlement (40)</button>
-  <button onclick="build('workshop')">⚒️ Workshop (60)</button>
-  <button onclick="build('council')">🏛️ Council (80)</button>
-  <button onclick="build('mine')">⛏️ Mine (70)</button>
-  <button onclick="build('smelter')">🔥 Smelter (90)</button>
+  <button id="btnSettlement">🏠 Settlement (40)</button>
+  <button id="btnWorkshop">⚒️ Workshop (60)</button>
+  <button id="btnCouncil">🏛️ Council (80)</button>
+  <button id="btnMine">⛏️ Mine (70)</button>
+  <button id="btnSmelter">🔥 Smelter (90)</button>
 </div>
 
 <div class="card">
@@ -63,68 +118,126 @@ button:disabled{opacity:.4}
   <div class="grid" id="city"></div>
 </div>
 
-<script>
-const MAX=9;
-const COST={settlement:40,workshop:60,council:80,mine:70,smelter:90};
-const UPKEEP={workshop:0.03,mine:0.05,smelter:0.08};
+<div class="card">
+  <h2>Advisor</h2>
+  <div id="advice" class="small"></div>
+</div>
 
-let s=JSON.parse(localStorage.getItem("idleRealm2"))||{
-  pop:24,prod:50,bronze:0,stab:90,
-  buildings:["⚒️","🏠","🏠","🏛️"]
+<div class="card">
+  <h2>Events</h2>
+  <div id="events"></div>
+</div>
+
+</main>
+
+<script>
+/* ===== STATE ===== */
+const MAX_SLOTS = 9;
+const COOLDOWN = 8;
+
+const state = JSON.parse(localStorage.getItem("idleRealm")) || {
+  pop:24,
+  prod:30,
+  bronze:0,
+  stab:85,
+  lastAction:0,
+  buildings:["⚒️","🏠","🏠","🏛️"],
+  events:["• The Bronze Age begins"],
+  lastTick:Date.now()
 };
 
-function save(){localStorage.setItem("idleRealm2",JSON.stringify(s));}
+function save(){ localStorage.setItem("idleRealm",JSON.stringify(state)); }
+function log(t){ state.events.unshift("• "+t); state.events=state.events.slice(0,10); }
 
-function build(t){
-  if(s.prod<COST[t]||s.buildings.length>=MAX)return;
-  s.prod-=COST[t];
-  const icon={settlement:"🏠",workshop:"⚒️",council:"🏛️",mine:"⛏️",smelter:"🔥"}[t];
-  s.buildings.push(icon);
-  save();update();
+function canAct(){ return Date.now()-state.lastAction>=COOLDOWN*1000; }
+
+/* ===== BUILD ===== */
+function build(type,cost,icon){
+  if(!canAct()||state.prod<cost||state.buildings.length>=MAX_SLOTS) return;
+  state.prod-=cost;
+  state.buildings.push(icon);
+  state.lastAction=Date.now();
+
+  if(type==="settlement"){ state.pop+=4; state.stab-=2; }
+  if(type==="workshop"){ }
+  if(type==="council"){ state.stab+=5; }
+  if(type==="mine"){ state.stab-=3; }
+  if(type==="smelter"){ }
+
+  log(type+" constructed");
+  update();
 }
 
+/* ===== PRODUCTION LOOP ===== */
+setInterval(()=>{
+  const now=Date.now();
+  const dt=(now-state.lastTick)/1000;
+  state.lastTick=now;
+
+  const workshops=state.buildings.filter(b=>b==="⚒️").length;
+  const mines=state.buildings.filter(b=>b==="⛏️").length;
+  const smelters=state.buildings.filter(b=>"🔥"===b).length;
+
+  const popBonus=1+Math.floor(state.pop/10)*0.05;
+
+  state.prod += workshops*0.4*popBonus*dt;
+  state.bronze += Math.min(mines,smelters)*0.15*dt;
+
+  if(state.stab<100) state.stab+=0.02*dt;
+
+  update();
+},1000);
+
+/* ===== UI ===== */
 function update(){
-  pop.textContent=s.pop;
-  prod.textContent=s.prod.toFixed(1);
-  bronze.textContent=s.bronze.toFixed(1);
-  stab.textContent=s.stab.toFixed(0);
+  pop.innerText=state.pop;
+  prod.innerText=state.prod.toFixed(1);
+  bronze.innerText=state.bronze.toFixed(1);
+  stab.innerText=Math.round(state.stab);
 
   city.innerHTML="";
-  for(let i=0;i<MAX;i++){
+  for(let i=0;i<MAX_SLOTS;i++){
     const d=document.createElement("div");
     d.className="tile";
-    d.textContent=s.buildings[i]||"⬜";
+    d.innerText=state.buildings[i]||"⬜";
     city.appendChild(d);
   }
 
-  objectives.innerHTML=`
-    <div class="obj ${s.bronze>=50?'ok':'warn'}">Produce 50 Bronze</div>
-    <div class="obj ${s.stab>=80?'ok':'warn'}">Maintain Stability ≥ 80%</div>
-  `;
+  events.innerHTML=state.events.map(e=>`<div>${e}</div>`).join("");
+
+  btnSettlement.disabled=!canAct()||state.prod<40;
+  btnWorkshop.disabled=!canAct()||state.prod<60;
+  btnCouncil.disabled=!canAct()||state.prod<80||state.buildings.includes("🏛️");
+  btnMine.disabled=!canAct()||state.prod<70;
+  btnSmelter.disabled=!canAct()||state.prod<90;
+
+  objMine.innerHTML=(state.buildings.includes("⛏️")?"✔":"⬜")+" Build 1 Mine";
+  objSmelter.innerHTML=(state.buildings.includes("🔥")?"✔":"⬜")+" Build 1 Smelter";
+  objBronze.innerHTML=(state.bronze>=50?"✔":"⬜")+" Produce 50 Bronze";
+  objStab.innerHTML=(state.stab>=80?"✔":"⬜")+" Maintain Stability ≥ 80%";
+
+  advice.innerText=getAdvice();
+  save();
 }
 
-setInterval(()=>{
-  const w=s.buildings.filter(b=>b==="⚒️").length;
-  const m=s.buildings.filter(b=>b==="⛏️").length;
-  const sm=s.buildings.filter(b=>b==="🔥").length;
+/* ===== ADVICE ===== */
+function getAdvice(){
+  if(!state.buildings.includes("⛏️")) return "Mining capacity is required to extract raw materials.";
+  if(!state.buildings.includes("🔥")) return "Ore stock without smelting will slow progress.";
+  if(state.stab<80) return "Stability is fragile. Rapid expansion can be dangerous.";
+  if(state.pop<30) return "A larger population improves long-term efficiency.";
+  return "Your realm is stable. Prepare for what comes next.";
+}
 
-  s.prod+=w*0.15;
-  if(sm>0&&s.prod>0){
-    const c=Math.min(s.prod,sm*0.05);
-    s.prod-=c;
-    s.bronze+=c;
-  }
-
-  let drain=0;
-  if(w)drain+=w*UPKEEP.workshop;
-  if(m)drain+=m*UPKEEP.mine;
-  if(sm)drain+=sm*UPKEEP.smelter;
-  s.stab=Math.max(0,s.stab-drain);
-
-  save();update();
-},1000);
+/* ===== BUTTONS ===== */
+btnSettlement.onclick=()=>build("settlement",40,"🏠");
+btnWorkshop.onclick=()=>build("workshop",60,"⚒️");
+btnCouncil.onclick=()=>build("council",80,"🏛️");
+btnMine.onclick=()=>build("mine",70,"⛏️");
+btnSmelter.onclick=()=>build("smelter",90,"🔥");
 
 update();
 </script>
+
 </body>
 </html>
