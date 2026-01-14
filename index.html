@@ -29,13 +29,13 @@ header{
 main{padding:16px;max-width:500px;margin:auto}
 .card{background:linear-gradient(180deg,var(--card),var(--card2));border-radius:16px;padding:16px;margin-bottom:16px}
 button{width:100%;border:none;border-radius:14px;padding:14px;margin-bottom:10px;background:var(--accent);color:white;font-size:16px}
-button.bronze{background:linear-gradient(180deg,#e0a24c,#b87328);color:#1a0f00;font-weight:600}
 button:disabled{opacity:.4}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .tile{background:#0f1730;border-radius:12px;height:70px;display:flex;align-items:center;justify-content:center;font-size:28px}
 .small{font-size:13px;color:var(--muted)}
 .obj{font-size:14px;margin-bottom:4px}
 .obj.ok{color:var(--ok)}
+.obj.bad{color:var(--bad)}
 .notice{background:#0f1730;padding:10px;border-radius:12px;font-size:13px;margin-bottom:12px}
 </style>
 </head>
@@ -58,19 +58,17 @@ button:disabled{opacity:.4}
 
 <div class="card">
   <h2>Era</h2>
-  <div id="eraTitle"></div>
-  <div id="eraDesc" class="small" style="margin-bottom:8px"></div>
+  <div><b>Bronze Age</b></div>
+  <div class="small" style="margin-bottom:8px">
+    Expansion slows. Preparation begins.
+  </div>
   <div id="objectives"></div>
-  <button id="advanceEra" class="bronze" style="display:none">
-    🥉 Enter the Bronze Age (50 ⚒️)
-  </button>
 </div>
 
 <div class="card">
   <h2>Build</h2>
-  <button id="btnSettle">🏠 Settlement</button>
-  <button id="btnWork">⚒️ Workshop</button>
-  <button id="btnCouncil">🏛️ Council</button>
+  <button id="btnMine">⛏️ Mine</button>
+  <button id="btnSmelter">🔥 Smelter</button>
   <div class="small" id="info"></div>
 </div>
 
@@ -87,102 +85,98 @@ button:disabled{opacity:.4}
 
 <script>
 /* ===== CONFIG ===== */
-const MAX_SLOTS=9;
-const COOLDOWN=8;
-const BASE_OFFLINE_CAP_FOUNDATIONS=300;
-const BASE_OFFLINE_CAP_BRONZE=600;
-const COUNCIL_OFFLINE_BONUS=300;
-const ERA2_COST = 50;
+const MAX_SLOTS = 9;
+const COOLDOWN = 10;
 
-const COST={settlement:15,workshop:20,council:30};
+/* production */
+const WORKSHOP_PROD = 0.2;
+const BRONZE_CONVERSION = 0.05;
 
-const DEFAULT={
-  era:"foundations",
-  pop:12,
-  prod:30,
-  bronze:0,
-  stab:100,
-  time:0,
-  lastAction:0,
-  lastSeen:Date.now(),
-  buildings:["⚒️"],
-  events:["• Realm founded with basic craftsmanship"]
+/* offline */
+const OFFLINE_CAP = 600; // 10 min
+
+/* costs */
+const COST = {
+  mine: 40,
+  smelter: 60
 };
 
-let state=loadState();
+const DEFAULT = {
+  era: "bronze",
+  pop: 12,
+  prod: 0,
+  bronze: 0,
+  stab: 85,
+  time: 0,
+  lastAction: 0,
+  lastSeen: Date.now(),
+  buildings: ["⚒️","🏛️","🏠","🏠","🏠"],
+  events: ["• The Bronze Age begins"]
+};
+
+let state = loadState();
 
 /* ===== LOAD / SAVE ===== */
 function loadState(){
   try{
-    const s=JSON.parse(localStorage.getItem("idleRealm"));
+    const s = JSON.parse(localStorage.getItem("idleRealm"));
     if(!s) return structuredClone(DEFAULT);
-    return Object.assign(structuredClone(DEFAULT),s);
-  }catch{return structuredClone(DEFAULT)}
+    return Object.assign(structuredClone(DEFAULT), s);
+  }catch{
+    return structuredClone(DEFAULT);
+  }
 }
 function save(){
-  state.lastSeen=Date.now();
-  localStorage.setItem("idleRealm",JSON.stringify(state));
+  state.lastSeen = Date.now();
+  localStorage.setItem("idleRealm", JSON.stringify(state));
 }
 function log(msg){
-  state.events.unshift("• "+msg);
-  state.events=state.events.slice(0,10);
+  state.events.unshift("• " + msg);
+  state.events = state.events.slice(0,10);
 }
 function canAct(){
-  return Date.now()-state.lastAction>=COOLDOWN*1000;
+  return Date.now() - state.lastAction >= COOLDOWN*1000;
 }
 
 /* ===== OFFLINE ===== */
 (function(){
-  const now=Date.now();
-  const elapsed=Math.floor((now-state.lastSeen)/1000);
-  if(elapsed<5) return;
+  const elapsed = Math.floor((Date.now() - state.lastSeen)/1000);
+  if(elapsed < 5) return;
 
-  const workshops=state.buildings.filter(b=>b==="⚒️").length;
-  const hasCouncil=state.buildings.includes("🏛️");
+  const workshops = state.buildings.filter(b=>b==="⚒️").length;
+  const effective = Math.min(elapsed, OFFLINE_CAP);
 
-  let cap=state.era==="foundations"
-    ? BASE_OFFLINE_CAP_FOUNDATIONS
-    : BASE_OFFLINE_CAP_BRONZE+(hasCouncil?COUNCIL_OFFLINE_BONUS:0);
+  const prodGain = workshops * WORKSHOP_PROD * effective;
+  state.prod += prodGain;
 
-  const effective=Math.min(elapsed,cap);
-  const prodGain=workshops*0.25*effective;
-  state.prod+=prodGain;
-
-  offlineNotice.innerHTML=`
+  offlineNotice.innerHTML = `
     <div class="notice">
       ⏳ While you were away:<br>
       +${prodGain.toFixed(1)} Production (${Math.floor(effective/60)} min)
-      ${elapsed>cap?"<br>⚠️ Production reached its limit.":""}
-    </div>`;
+      ${elapsed>OFFLINE_CAP ? "<br>⚠️ Production stopped." : ""}
+    </div>
+  `;
 })();
 
-/* ===== ERA ===== */
+/* ===== OBJECTIVES (ERA 2) ===== */
 function eraObjectives(){
   return [
-    ["Build 3 Settlements",state.buildings.filter(b=>b==="🏠").length>=3],
-    ["Reach 50 Production",state.prod>=50],
-    ["Establish the Council",state.buildings.includes("🏛️")],
-    ["Stability ≥ 70%",state.stab>=70]
+    ["Build 1 Mine", state.buildings.includes("⛏️")],
+    ["Build 1 Smelter", state.buildings.includes("🔥")],
+    ["Produce 50 Bronze", state.bronze >= 50],
+    ["Maintain Stability ≥ 80%", state.stab >= 80]
   ];
-}
-function foundationsComplete(){
-  return eraObjectives().every(o=>o[1]);
 }
 
 /* ===== UPDATE ===== */
 function update(){
-  pop.innerText=state.pop.toFixed(1);
-  prod.innerText=state.prod.toFixed(1);
-  bronze.innerText=state.bronze.toFixed(1);
-  stab.innerText=Math.max(0,Math.min(100,state.stab)).toFixed(0);
-  time.innerText=state.time;
+  pop.innerText = state.pop.toFixed(1);
+  prod.innerText = state.prod.toFixed(1);
+  bronze.innerText = state.bronze.toFixed(1);
+  stab.innerText = Math.max(0,Math.min(100,state.stab)).toFixed(0);
+  time.innerText = state.time;
 
-  eraTitle.innerHTML=state.era==="foundations"?"<b>Foundations</b>":"<b>Bronze Age</b>";
-  eraDesc.innerText=state.era==="foundations"
-    ?"Fast growth to understand the game."
-    :"Preparation replaces expansion. Stability matters.";
-
-  objectives.innerHTML="";
+  objectives.innerHTML = "";
   eraObjectives().forEach(o=>{
     const d=document.createElement("div");
     d.className="obj"+(o[1]?" ok":"");
@@ -190,71 +184,63 @@ function update(){
     objectives.appendChild(d);
   });
 
-  advanceEra.style.display =
-    state.era==="foundations" && foundationsComplete() ? "block" : "none";
-
-  advanceEra.disabled = state.prod < ERA2_COST;
-
   const cd=Math.max(0,Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000));
-  info.innerText=`Settlement ${COST.settlement} | Workshop ${COST.workshop} | Council ${COST.council}`+(canAct()?" • Ready":` • Cooldown ${cd}s`);
+  info.innerText = canAct()
+    ? "Actions ready"
+    : `Cooldown ${cd}s`;
 
-  btnSettle.disabled=!canAct()||state.prod<COST.settlement||state.buildings.length>=MAX_SLOTS;
-  btnWork.disabled=!canAct()||state.prod<COST.workshop||state.buildings.length>=MAX_SLOTS;
-  btnCouncil.disabled=!canAct()||state.prod<COST.council||state.buildings.includes("🏛️");
+  btnMine.disabled = !canAct() || state.prod < COST.mine || state.buildings.length>=MAX_SLOTS;
+  btnSmelter.disabled = !canAct() || state.prod < COST.smelter || state.buildings.length>=MAX_SLOTS;
 
   city.innerHTML="";
   for(let i=0;i<MAX_SLOTS;i++){
     const t=document.createElement("div");
     t.className="tile";
-    t.innerText=state.buildings[i]||"⬜";
+    t.innerText = state.buildings[i] || "⬜";
     city.appendChild(t);
   }
 
-  events.innerHTML=state.events.map(e=>`<div>${e}</div>`).join("");
+  events.innerHTML = state.events.map(e=>`<div>${e}</div>`).join("");
   save();
 }
 
 /* ===== ACTIONS ===== */
 function build(type){
   if(!canAct()) return;
-  if(type==="settlement"){state.prod-=COST.settlement;state.pop+=4;state.stab-=6;state.buildings.push("🏠");log("Settlement built")}
-  if(type==="workshop"){state.prod-=COST.workshop;state.buildings.push("⚒️");log("Workshop built")}
-  if(type==="council"){state.prod-=COST.council;state.stab+=15;state.buildings.push("🏛️");log("Council established")}
-  state.lastAction=Date.now();
+
+  if(type==="mine"){
+    state.prod -= COST.mine;
+    state.buildings.push("⛏️");
+    log("Mine constructed");
+  }
+  if(type==="smelter"){
+    state.prod -= COST.smelter;
+    state.buildings.push("🔥");
+    log("Smelter constructed");
+  }
+  state.lastAction = Date.now();
   update();
 }
 
-btnSettle.onclick=()=>build("settlement");
-btnWork.onclick=()=>build("workshop");
-btnCouncil.onclick=()=>build("council");
-
-advanceEra.onclick=()=>{
-  if(state.prod < ERA2_COST) return;
-  state.prod -= ERA2_COST;
-  state.era="bronze";
-  log("The Bronze Age begins");
-  update();
-};
+btnMine.onclick = ()=>build("mine");
+btnSmelter.onclick = ()=>build("smelter");
 
 /* ===== TICK ===== */
 setInterval(()=>{
   state.time++;
-  const workshops=state.buildings.filter(b=>b==="⚒️").length;
-  const hasCouncil=state.buildings.includes("🏛️");
 
-  state.prod+=workshops*0.25;
+  const workshops = state.buildings.filter(b=>b==="⚒️").length;
+  const smelters = state.buildings.filter(b=>b==="🔥").length;
 
-  if(state.era==="bronze"&&state.stab>=80){
-    state.bronze+=workshops*0.05;
+  state.prod += workshops * WORKSHOP_PROD;
+
+  if(smelters > 0 && state.prod > 0 && state.stab >= 80){
+    const convert = Math.min(state.prod, smelters * BRONZE_CONVERSION);
+    state.prod -= convert;
+    state.bronze += convert;
   }
 
-  if(state.era==="bronze"){
-    let upkeep=workshops*0.05;
-    if(hasCouncil) upkeep*=0.5;
-    state.stab-=upkeep;
-  }
-
-  if(state.stab<100) state.stab+=0.02;
+  if(state.stab < 100) state.stab += 0.02;
   update();
 },1000);
 
