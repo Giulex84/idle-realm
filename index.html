@@ -15,7 +15,6 @@
   --text:#e6ecff;
   --muted:#9aa4c7;
   --ok:#22c55e;
-  --bad:#ef4444;
 }
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
 body{margin:0;background:linear-gradient(180deg,#0a1020,#050a14);color:var(--text)}
@@ -35,7 +34,6 @@ button:disabled{opacity:.4}
 .small{font-size:13px;color:var(--muted)}
 .obj{font-size:14px;margin-bottom:4px}
 .obj.ok{color:var(--ok)}
-.obj.bad{color:var(--bad)}
 .notice{background:#0f1730;padding:10px;border-radius:12px;font-size:13px;margin-bottom:12px}
 </style>
 </head>
@@ -60,7 +58,7 @@ button:disabled{opacity:.4}
   <h2>Era</h2>
   <div><b>Bronze Age</b></div>
   <div class="small" style="margin-bottom:8px">
-    Expansion slows. Preparation begins.
+    Expansion slows. Infrastructure must adapt.
   </div>
   <div id="objectives"></div>
 </div>
@@ -87,31 +85,26 @@ button:disabled{opacity:.4}
 /* ===== CONFIG ===== */
 const MAX_SLOTS = 9;
 const COOLDOWN = 10;
+const WORKSHOP_PROD = 0.12;
+const BRONZE_RATE = 0.04;
+const OFFLINE_CAP = 600;
 
-/* production */
-const WORKSHOP_PROD = 0.2;
-const BRONZE_CONVERSION = 0.05;
-
-/* offline */
-const OFFLINE_CAP = 600; // 10 min
-
-/* costs */
 const COST = {
-  mine: 40,
-  smelter: 60
+  mine: 60,
+  smelter: 80
 };
 
 const DEFAULT = {
   era: "bronze",
-  pop: 12,
-  prod: 0,
+  pop: 24,
+  prod: 80,
   bronze: 0,
-  stab: 85,
+  stab: 90,
   time: 0,
   lastAction: 0,
   lastSeen: Date.now(),
-  buildings: ["⚒️","🏛️","🏠","🏠","🏠"],
-  events: ["• The Bronze Age begins"]
+  buildings: ["⚒️","⚒️","🏠","🏠","🏠","🏛️"],
+  events: ["• The realm restructures for the Bronze Age"]
 };
 
 let state = loadState();
@@ -120,7 +113,7 @@ let state = loadState();
 function loadState(){
   try{
     const s = JSON.parse(localStorage.getItem("idleRealm"));
-    if(!s) return structuredClone(DEFAULT);
+    if(!s || s.era !== "bronze") return structuredClone(DEFAULT);
     return Object.assign(structuredClone(DEFAULT), s);
   }catch{
     return structuredClone(DEFAULT);
@@ -145,20 +138,19 @@ function canAct(){
 
   const workshops = state.buildings.filter(b=>b==="⚒️").length;
   const effective = Math.min(elapsed, OFFLINE_CAP);
+  const gain = workshops * WORKSHOP_PROD * effective;
 
-  const prodGain = workshops * WORKSHOP_PROD * effective;
-  state.prod += prodGain;
+  state.prod += gain;
 
   offlineNotice.innerHTML = `
     <div class="notice">
       ⏳ While you were away:<br>
-      +${prodGain.toFixed(1)} Production (${Math.floor(effective/60)} min)
-      ${elapsed>OFFLINE_CAP ? "<br>⚠️ Production stopped." : ""}
+      +${gain.toFixed(1)} Production (${Math.floor(effective/60)} min)
     </div>
   `;
 })();
 
-/* ===== OBJECTIVES (ERA 2) ===== */
+/* ===== OBJECTIVES ===== */
 function eraObjectives(){
   return [
     ["Build 1 Mine", state.buildings.includes("⛏️")],
@@ -170,13 +162,13 @@ function eraObjectives(){
 
 /* ===== UPDATE ===== */
 function update(){
-  pop.innerText = state.pop.toFixed(1);
+  pop.innerText = state.pop.toFixed(0);
   prod.innerText = state.prod.toFixed(1);
   bronze.innerText = state.bronze.toFixed(1);
   stab.innerText = Math.max(0,Math.min(100,state.stab)).toFixed(0);
   time.innerText = state.time;
 
-  objectives.innerHTML = "";
+  objectives.innerHTML="";
   eraObjectives().forEach(o=>{
     const d=document.createElement("div");
     d.className="obj"+(o[1]?" ok":"");
@@ -185,9 +177,7 @@ function update(){
   });
 
   const cd=Math.max(0,Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000));
-  info.innerText = canAct()
-    ? "Actions ready"
-    : `Cooldown ${cd}s`;
+  info.innerText = canAct() ? "Actions ready" : `Cooldown ${cd}s`;
 
   btnMine.disabled = !canAct() || state.prod < COST.mine || state.buildings.length>=MAX_SLOTS;
   btnSmelter.disabled = !canAct() || state.prod < COST.smelter || state.buildings.length>=MAX_SLOTS;
@@ -234,13 +224,13 @@ setInterval(()=>{
 
   state.prod += workshops * WORKSHOP_PROD;
 
-  if(smelters > 0 && state.prod > 0 && state.stab >= 80){
-    const convert = Math.min(state.prod, smelters * BRONZE_CONVERSION);
+  if(smelters>0 && state.prod>0 && state.stab>=80){
+    const convert = Math.min(state.prod, smelters * BRONZE_RATE);
     state.prod -= convert;
     state.bronze += convert;
   }
 
-  if(state.stab < 100) state.stab += 0.02;
+  if(state.stab < 100) state.stab += 0.015;
   update();
 },1000);
 
