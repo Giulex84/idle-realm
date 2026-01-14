@@ -89,10 +89,7 @@ const WORKSHOP_PROD = 0.12;
 const BRONZE_RATE = 0.04;
 const OFFLINE_CAP = 600;
 
-const COST = {
-  mine: 60,
-  smelter: 80
-};
+const COST = { mine: 60, smelter: 80 };
 
 const DEFAULT = {
   era: "bronze",
@@ -103,8 +100,9 @@ const DEFAULT = {
   time: 0,
   lastAction: 0,
   lastSeen: Date.now(),
-  buildings: ["⚒️","⚒️","🏠","🏠","🏠","🏛️"],
-  events: ["• The realm restructures for the Bronze Age"]
+  bronzeInitialized: false,
+  buildings: [],
+  events: []
 };
 
 let state = loadState();
@@ -113,7 +111,7 @@ let state = loadState();
 function loadState(){
   try{
     const s = JSON.parse(localStorage.getItem("idleRealm"));
-    if(!s || s.era !== "bronze") return structuredClone(DEFAULT);
+    if(!s) return structuredClone(DEFAULT);
     return Object.assign(structuredClone(DEFAULT), s);
   }catch{
     return structuredClone(DEFAULT);
@@ -127,12 +125,32 @@ function log(msg){
   state.events.unshift("• " + msg);
   state.events = state.events.slice(0,10);
 }
-function canAct(){
-  return Date.now() - state.lastAction >= COOLDOWN*1000;
+
+/* ===== ERA MIGRATION (CRITICA) ===== */
+function initBronzeIfNeeded(){
+  if(state.bronzeInitialized) return;
+
+  // keep only core buildings
+  const kept = [];
+  state.buildings.forEach(b=>{
+    if(["⚒️","🏠","🏛️"].includes(b) && kept.length < 6){
+      kept.push(b);
+    }
+  });
+
+  state.buildings = kept;
+  state.prod = Math.min(state.prod, 100);
+  state.bronze = 0;
+  state.stab = Math.max(state.stab, 85);
+  state.events.unshift("• The realm reorganizes for metallurgy");
+
+  state.bronzeInitialized = true;
 }
 
 /* ===== OFFLINE ===== */
 (function(){
+  initBronzeIfNeeded();
+
   const elapsed = Math.floor((Date.now() - state.lastSeen)/1000);
   if(elapsed < 5) return;
 
@@ -176,11 +194,8 @@ function update(){
     objectives.appendChild(d);
   });
 
-  const cd=Math.max(0,Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000));
-  info.innerText = canAct() ? "Actions ready" : `Cooldown ${cd}s`;
-
-  btnMine.disabled = !canAct() || state.prod < COST.mine || state.buildings.length>=MAX_SLOTS;
-  btnSmelter.disabled = !canAct() || state.prod < COST.smelter || state.buildings.length>=MAX_SLOTS;
+  btnMine.disabled = state.prod < COST.mine || state.buildings.length>=MAX_SLOTS;
+  btnSmelter.disabled = state.prod < COST.smelter || state.buildings.length>=MAX_SLOTS;
 
   city.innerHTML="";
   for(let i=0;i<MAX_SLOTS;i++){
@@ -196,8 +211,6 @@ function update(){
 
 /* ===== ACTIONS ===== */
 function build(type){
-  if(!canAct()) return;
-
   if(type==="mine"){
     state.prod -= COST.mine;
     state.buildings.push("⛏️");
@@ -208,12 +221,8 @@ function build(type){
     state.buildings.push("🔥");
     log("Smelter constructed");
   }
-  state.lastAction = Date.now();
   update();
 }
-
-btnMine.onclick = ()=>build("mine");
-btnSmelter.onclick = ()=>build("smelter");
 
 /* ===== TICK ===== */
 setInterval(()=>{
@@ -224,15 +233,18 @@ setInterval(()=>{
 
   state.prod += workshops * WORKSHOP_PROD;
 
-  if(smelters>0 && state.prod>0 && state.stab>=80){
-    const convert = Math.min(state.prod, smelters * BRONZE_RATE);
-    state.prod -= convert;
-    state.bronze += convert;
+  if(smelters && state.prod && state.stab>=80){
+    const c = Math.min(state.prod, smelters * BRONZE_RATE);
+    state.prod -= c;
+    state.bronze += c;
   }
 
   if(state.stab < 100) state.stab += 0.015;
   update();
 },1000);
+
+btnMine.onclick=()=>build("mine");
+btnSmelter.onclick=()=>build("smelter");
 
 update();
 </script>
