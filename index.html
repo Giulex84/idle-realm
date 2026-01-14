@@ -11,8 +11,10 @@
   --card:#141c33;
   --card2:#1b2546;
   --accent:#2f6bff;
+  --bronze:#c27c2c;
   --text:#e6ecff;
   --muted:#9aa4c7;
+  --ok:#22c55e;
 }
 
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
@@ -29,7 +31,9 @@ header{
   background:#060b18;
   padding:8px 12px;
   display:flex;
+  flex-wrap:wrap;
   justify-content:space-between;
+  gap:8px;
   font-size:14px;
   z-index:10;
 }
@@ -54,6 +58,12 @@ button{
   font-size:16px;
 }
 
+button.bronze{
+  background:linear-gradient(180deg,#e0a24c,#b87328);
+  color:#1a0f00;
+  font-weight:600;
+}
+
 button:disabled{opacity:.4}
 
 .grid{
@@ -73,6 +83,9 @@ button:disabled{opacity:.4}
 }
 
 .small{font-size:13px;color:var(--muted)}
+.obj{font-size:14px;margin-bottom:4px}
+.obj.ok{color:var(--ok)}
+.locked{opacity:.5}
 </style>
 </head>
 
@@ -81,6 +94,7 @@ button:disabled{opacity:.4}
 <header>
   <span>👥 <b id="pop"></b></span>
   <span>⚒️ <b id="prod"></b></span>
+  <span>🥉 <b id="bronze"></b></span>
   <span>🛡️ <b id="stab"></b>%</span>
   <span>⏳ <b id="time"></b></span>
 </header>
@@ -88,6 +102,16 @@ button:disabled{opacity:.4}
 <main>
   <h1>Idle Realm</h1>
   <div class="small">A living world shaped by time and choices</div>
+
+  <div class="card">
+    <h2>Era</h2>
+    <div id="eraTitle"></div>
+    <div id="eraDesc" class="small" style="margin-bottom:8px"></div>
+    <div id="objectives"></div>
+    <button id="advanceEra" class="bronze" style="display:none">
+      🥉 Enter the Bronze Age
+    </button>
+  </div>
 
   <div class="card">
     <h2>Build</h2>
@@ -103,23 +127,13 @@ button:disabled{opacity:.4}
   </div>
 
   <div class="card">
-    <h2>Era</h2>
-    <div><b>Foundations</b> — fast growth to understand the game.</div>
-  </div>
-
-  <div class="card">
     <h2>Events</h2>
     <div id="events"></div>
-    <div class="small" style="margin-top:8px">
-      Production grows over time.<br/>
-      Buildings occupy limited slots.
-    </div>
   </div>
 </main>
 
 <script>
-/* ===== FOUNDATIONS BASELINE — DO NOT REBALANCE ===== */
-
+/* ===== CONFIG ===== */
 const MAX_SLOTS = 9;
 const COOLDOWN = 8;
 
@@ -133,29 +147,25 @@ const DEFAULT = {
   era: "foundations",
   pop: 12,
   prod: 30,
+  bronze: 0,
   stab: 100,
   time: 0,
   lastAction: 0,
-  buildings: ["⚒️"], // 1 workshop iniziale
+  buildings: ["⚒️"],
   events: ["• Realm founded with basic craftsmanship"]
 };
 
 function loadState(){
   let s;
-  try{
-    s = JSON.parse(localStorage.getItem("idleRealm"));
-  }catch{
-    return structuredClone(DEFAULT);
-  }
-  if(!s || typeof s !== "object") return structuredClone(DEFAULT);
+  try{ s = JSON.parse(localStorage.getItem("idleRealm")); }
+  catch{ return structuredClone(DEFAULT); }
 
-  // ripristino difensivo
+  if(!s || typeof s !== "object") return structuredClone(DEFAULT);
   for(const k in DEFAULT){
     if(typeof s[k] !== typeof DEFAULT[k]) s[k] = DEFAULT[k];
   }
   if(!Array.isArray(s.buildings)) s.buildings = ["⚒️"];
   if(!Array.isArray(s.events)) s.events = [];
-
   return s;
 }
 
@@ -174,11 +184,61 @@ function canAct(){
   return Date.now() - state.lastAction >= COOLDOWN * 1000;
 }
 
+/* ===== ERA LOGIC ===== */
+function eraObjectives(){
+  if(state.era==="foundations"){
+    return [
+      ["Build 3 Settlements", state.buildings.filter(b=>b==="🏠").length>=3],
+      ["Reach 50 Production", state.prod>=50],
+      ["Establish the Council", state.buildings.includes("🏛️")],
+      ["Stability ≥ 70%", state.stab>=70]
+    ];
+  }
+  return [];
+}
+
+function foundationsComplete(){
+  return eraObjectives().every(o=>o[1]);
+}
+
+/* ===== UPDATE ===== */
 function update(){
   pop.innerText = state.pop.toFixed(1);
   prod.innerText = state.prod.toFixed(1);
+  bronze.innerText = state.bronze.toFixed(1);
   stab.innerText = Math.max(0,Math.min(100,state.stab)).toFixed(0);
   time.innerText = state.time;
+
+  eraTitle.innerHTML =
+    state.era==="foundations"
+    ? "<b>Foundations</b>"
+    : "<b>Bronze Age</b>";
+
+  eraDesc.innerText =
+    state.era==="foundations"
+    ? "Fast growth to understand the game."
+    : "Resources are refined. Preparation begins.";
+
+  objectives.innerHTML="";
+  if(state.era==="foundations"){
+    eraObjectives().forEach(o=>{
+      const d=document.createElement("div");
+      d.className="obj"+(o[1]?" ok":"");
+      d.innerText=(o[1]?"✔ ":"☐ ")+o[0];
+      objectives.appendChild(d);
+    });
+  }else{
+    objectives.innerHTML = `
+      <div class="obj">✔ Bronze production ongoing</div>
+      <div class="obj locked">☐ Iron Age (Approaching)</div>
+      <div class="small">Something is coming. It may be war. It may be famine.</div>
+    `;
+  }
+
+  advanceEra.style.display =
+    state.era==="foundations" && foundationsComplete()
+    ? "block"
+    : "none";
 
   const cd = Math.max(0,
     Math.ceil((COOLDOWN*1000 - (Date.now()-state.lastAction))/1000)
@@ -197,7 +257,7 @@ function update(){
   btnCouncil.disabled =
     !canAct() || state.prod < COST.council || state.buildings.includes("🏛️");
 
-  city.innerHTML = "";
+  city.innerHTML="";
   for(let i=0;i<MAX_SLOTS;i++){
     const t=document.createElement("div");
     t.className="tile";
@@ -209,6 +269,7 @@ function update(){
   save();
 }
 
+/* ===== ACTIONS ===== */
 function build(type){
   if(!canAct()) return;
 
@@ -241,11 +302,22 @@ btnSettle.onclick = () => build("settlement");
 btnWork.onclick   = () => build("workshop");
 btnCouncil.onclick= () => build("council");
 
+advanceEra.onclick = ()=>{
+  state.era="bronze";
+  log("The Bronze Age begins");
+  update();
+};
+
+/* ===== TICK ===== */
 setInterval(()=>{
   state.time++;
 
   const workshops = state.buildings.filter(b=>b==="⚒️").length;
   state.prod += workshops * 0.8;
+
+  if(state.era==="bronze"){
+    state.bronze += workshops * 0.15;
+  }
 
   if(state.stab < 100) state.stab += 0.1;
   update();
