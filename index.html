@@ -15,7 +15,6 @@
   --text:#e6ecff;
   --muted:#9aa4c7;
   --ok:#22c55e;
-  --bad:#ef4444;
 }
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
 body{margin:0;background:linear-gradient(180deg,#0a1020,#050a14);color:var(--text)}
@@ -61,6 +60,10 @@ button:disabled{opacity:.4}
   <div id="objectives"></div>
   <div id="eraNote" class="small"></div>
 
+  <button id="advanceEra" class="bronze" style="display:none">
+    🥉 Enter the Bronze Age (50 ⚒️)
+  </button>
+
   <button id="advanceIron" class="bronze" style="display:none">
     ⚔️ Enter the Iron Age (50 🥉 / 20 ⚒️)
   </button>
@@ -71,7 +74,7 @@ button:disabled{opacity:.4}
   <button id="btnSettle">🏠 Settlement (15 ⚒️)</button>
   <button id="btnWork">⚒️ Workshop (20 ⚒️)</button>
   <button id="btnCouncil">🏛️ Council (30 ⚒️)</button>
-  <button id="btnCouncil2">🏛️ Council II (30 🥉)</button>
+  <button id="btnCouncil2" style="display:none">🏛️ Council II (30 🥉)</button>
   <div class="small" id="info"></div>
 </div>
 
@@ -88,8 +91,10 @@ button:disabled{opacity:.4}
 
 <script>
 /* ===== CONFIG ===== */
-let MAX_SLOTS = 12;
+let MAX_SLOTS = 9;
 const COOLDOWN = 8;
+const ERA2_COST = 50;
+
 const STABILITY_TARGET = 85;
 const STABILITY_TIME_REQUIRED = 300; // 5 minutes
 
@@ -101,17 +106,17 @@ const COST = {
 };
 
 const DEFAULT = {
-  era:"bronze",
-  pop:20,
+  era:"foundations",
+  pop:12,
   prod:30,
   bronze:0,
-  stab:80,
+  stab:100,
   time:0,
   lastAction:0,
   buildings:["⚒️"],
   council2:false,
   stableTime:0,
-  events:["• The Bronze Age begins"]
+  events:["• Realm founded with basic craftsmanship"]
 };
 
 let state = loadState();
@@ -121,8 +126,10 @@ function loadState(){
   try{
     const s = JSON.parse(localStorage.getItem("idleRealm"));
     if(!s) return structuredClone(DEFAULT);
+    if(!["foundations","bronze","iron"].includes(s.era)) throw "bad era";
     return Object.assign(structuredClone(DEFAULT), s);
   }catch{
+    localStorage.removeItem("idleRealm");
     return structuredClone(DEFAULT);
   }
 }
@@ -146,52 +153,70 @@ function update(){
   stab.innerText = state.stab.toFixed(0);
   time.innerText = state.time;
 
-  eraTitle.innerHTML = "<b>Bronze Age</b>";
-  eraDesc.innerText = "Growth slows. Governance matters.";
-
   objectives.innerHTML = "";
 
-  // Stability objective
-  let stabText = state.stableTime > 0
-    ? `Stability holding: ${Math.floor(state.stableTime/60)}:${String(state.stableTime%60).padStart(2,"0")} / 5:00`
-    : "Maintain stability over time.";
+  if(state.era==="foundations"){
+    eraTitle.innerHTML="<b>Foundations</b>";
+    eraDesc.innerText="Fast growth to understand the game.";
 
-  const stabDone = state.stableTime >= STABILITY_TIME_REQUIRED;
-  objectives.innerHTML += `<div class="obj ${stabDone?"ok":""}">
-    ${stabDone?"✔":"☐"} Stability ≥ 85% (maintain for 5 minutes)
-    <div class="small">${stabText}</div>
-  </div>`;
+    const obj = [
+      ["Build 3 Settlements", state.buildings.filter(b=>b==="🏠").length>=3],
+      ["Reach 50 Production", state.prod>=50],
+      ["Establish the Council", state.buildings.includes("🏛️")],
+      ["Stability ≥ 70%", state.stab>=70]
+    ];
 
-  // Bronze objective
-  const bronzeDone = state.bronze >= 75;
-  objectives.innerHTML += `<div class="obj ${bronzeDone?"ok":""}">
-    ${bronzeDone?"✔":"☐"} Bronze ≥ 75
-  </div>`;
+    obj.forEach(o=>{
+      objectives.innerHTML+=`<div class="obj ${o[1]?"ok":""}">
+        ${o[1]?"✔":"☐"} ${o[0]}</div>`;
+    });
 
-  // Council II objective
-  objectives.innerHTML += `<div class="obj ${state.council2?"ok":""}">
-    ${state.council2?"✔":"☐"} Council II established
-  </div>`;
+    advanceEra.style.display = obj.every(o=>o[1]) ? "block":"none";
+    advanceIron.style.display="none";
+    eraNote.innerText="";
+  }
 
-  eraNote.innerText = "A stable society must prove itself over time.";
+  if(state.era==="bronze"){
+    eraTitle.innerHTML="<b>Bronze Age</b>";
+    eraDesc.innerText="Growth slows. Governance matters.";
 
-  // Iron Age button
-  advanceIron.style.display =
-    stabDone && bronzeDone && state.council2 ? "block" : "none";
-  advanceIron.disabled = state.bronze < 50 || state.prod < 20;
+    const stabDone = state.stableTime>=STABILITY_TIME_REQUIRED;
+    const bronzeDone = state.bronze>=75;
+
+    const timerText = state.stableTime>0
+      ? `Stability holding: ${Math.floor(state.stableTime/60)}:${String(state.stableTime%60).padStart(2,"0")} / 5:00`
+      : "Maintain stability over time.";
+
+    objectives.innerHTML+=`<div class="obj ${stabDone?"ok":""}">
+      ${stabDone?"✔":"☐"} Stability ≥ 85% (maintain for 5 minutes)
+      <div class="small">${timerText}</div>
+    </div>`;
+
+    objectives.innerHTML+=`<div class="obj ${bronzeDone?"ok":""}">
+      ${bronzeDone?"✔":"☐"} Bronze ≥ 75
+    </div>`;
+
+    objectives.innerHTML+=`<div class="obj ${state.council2?"ok":""}">
+      ${state.council2?"✔":"☐"} Council II established
+    </div>`;
+
+    eraNote.innerText="A stable society must prove itself over time.";
+
+    advanceEra.style.display="none";
+    advanceIron.style.display =
+      stabDone && bronzeDone && state.council2 ? "block":"none";
+    advanceIron.disabled = state.bronze<50 || state.prod<20;
+  }
+
+  btnCouncil2.style.display = state.era==="bronze" ? "block":"none";
 
   info.innerText = canAct() ? "Ready" : "Cooldown…";
 
-  btnSettle.disabled = !canAct() || state.prod < COST.settlement || state.buildings.length >= MAX_SLOTS;
-  btnWork.disabled = !canAct() || state.prod < COST.workshop || state.buildings.length >= MAX_SLOTS;
-  btnCouncil.disabled = !canAct() || state.prod < COST.council || state.buildings.includes("🏛️");
-  btnCouncil2.disabled = !canAct() || state.bronze < COST.council2 || state.council2;
-
-  city.innerHTML = "";
+  city.innerHTML="";
   for(let i=0;i<MAX_SLOTS;i++){
-    const t = document.createElement("div");
-    t.className = "tile";
-    t.innerText = state.buildings[i] || "⬜";
+    const t=document.createElement("div");
+    t.className="tile";
+    t.innerText=state.buildings[i]||"⬜";
     city.appendChild(t);
   }
 
@@ -204,42 +229,45 @@ function build(type){
   if(!canAct()) return;
 
   if(type==="settlement"){
-    state.prod -= COST.settlement;
-    state.pop += 4;
+    state.prod-=COST.settlement;
+    state.pop+=4;
     state.buildings.push("🏠");
-    log("Settlement constructed");
   }
   if(type==="workshop"){
-    state.prod -= COST.workshop;
+    state.prod-=COST.workshop;
     state.buildings.push("⚒️");
-    log("Workshop constructed");
   }
   if(type==="council"){
-    state.prod -= COST.council;
-    state.stab += 10;
+    state.prod-=COST.council;
+    state.stab+=10;
     state.buildings.push("🏛️");
-    log("Council established");
   }
   if(type==="council2"){
-    state.bronze -= COST.council2;
-    state.council2 = true;
-    log("Council II established");
+    state.bronze-=COST.council2;
+    state.council2=true;
   }
-  state.lastAction = Date.now();
+
+  state.lastAction=Date.now();
   update();
 }
 
-btnSettle.onclick = ()=>build("settlement");
-btnWork.onclick = ()=>build("workshop");
-btnCouncil.onclick = ()=>build("council");
-btnCouncil2.onclick = ()=>build("council2");
+btnSettle.onclick=()=>build("settlement");
+btnWork.onclick=()=>build("workshop");
+btnCouncil.onclick=()=>build("council");
+btnCouncil2.onclick=()=>build("council2");
 
-/* ===== IRON AGE ===== */
-advanceIron.onclick = ()=>{
-  if(state.bronze < 50 || state.prod < 20) return;
-  state.bronze -= 50;
-  state.prod -= 20;
-  state.era = "iron";
+advanceEra.onclick=()=>{
+  state.prod-=ERA2_COST;
+  state.era="bronze";
+  MAX_SLOTS=12;
+  log("The Bronze Age begins");
+  update();
+};
+
+advanceIron.onclick=()=>{
+  state.bronze-=50;
+  state.prod-=20;
+  state.era="iron";
   log("The Iron Age begins. Old certainties fade.");
   update();
 };
@@ -248,31 +276,30 @@ advanceIron.onclick = ()=>{
 setInterval(()=>{
   state.time++;
 
-  const workshops = state.buildings.filter(b=>b==="⚒️").length;
+  const w = state.buildings.filter(b=>b==="⚒️").length;
+  state.prod += w*0.15;
 
-  state.prod += workshops * 0.15;
-  if(state.stab >= 80){
-    state.bronze += workshops * 0.05;
+  if(state.era==="bronze" && state.stab>=80){
+    state.bronze += w*0.05;
   }
 
-  // Governance pressure
-  let pressure = workshops * 0.04;
-  if(state.council2) pressure *= 0.5;
+  let pressure = w*0.04;
+  if(state.council2) pressure*=0.5;
 
-  // Population effect
-  if(state.pop >= 30){
-    state.stab += 0.04;
-  }else if(state.pop >= 20){
-    pressure = 0;
+  if(state.pop>=30){
+    state.stab+=0.04;
+  }else if(state.pop>=20){
+    pressure=0;
   }
 
-  state.stab -= pressure;
+  state.stab-=pressure;
 
-  // Stability timer
-  if(state.stab >= STABILITY_TARGET){
-    state.stableTime++;
-  }else{
-    state.stableTime = 0;
+  if(state.era==="bronze"){
+    if(state.stab>=STABILITY_TARGET){
+      state.stableTime++;
+    }else{
+      state.stableTime=0;
+    }
   }
 
   update();
