@@ -1,14 +1,12 @@
 <script>
-/* ======================================
-   IDLE REALM — CORE SCRIPT (SAFE)
-   Compatibile con HTML esistente
-   ====================================== */
+/* =================================================
+   IDLE REALM — CORE SCRIPT (SAFE & ALIGNED)
+   ================================================= */
 
 let MAX_SLOTS = 9;
 const COOLDOWN = 8;
-const BRONZE_TIMER_TARGET = 300;
 
-/* ========= DOM MAP ========= */
+/* ================= DOM ================= */
 const popEl = document.getElementById("pop");
 const prodEl = document.getElementById("prod");
 const bronzeEl = document.getElementById("bronze");
@@ -21,7 +19,6 @@ const objectives = document.getElementById("objectives");
 
 const city = document.getElementById("city");
 const eventsEl = document.getElementById("events");
-const removeHint = document.getElementById("removeHint");
 
 const btnSettlement = document.getElementById("btnSettlement");
 const btnWorkshop = document.getElementById("btnWorkshop");
@@ -29,7 +26,7 @@ const btnMine = document.getElementById("btnMine");
 const btnCouncil = document.getElementById("btnCouncil");
 const btnCouncil2 = document.getElementById("btnCouncil2");
 
-/* ========= STATE ========= */
+/* ================= STATE ================= */
 const DEFAULT = {
   era: "foundations",
   pop: 12,
@@ -38,7 +35,7 @@ const DEFAULT = {
   stab: 100,
   time: 0,
   lastAction: 0,
-  buildings: [],
+  buildings: ["⚒️"],
   events: ["Realm founded with basic craftsmanship."],
   foundationsCompleted: false,
   bronzeStabilityTime: 0
@@ -47,7 +44,7 @@ const DEFAULT = {
 let state = JSON.parse(localStorage.getItem("idleRealm"));
 if (!state) state = JSON.parse(JSON.stringify(DEFAULT));
 
-/* ========= UTIL ========= */
+/* ================= UTIL ================= */
 function save() {
   localStorage.setItem("idleRealm", JSON.stringify(state));
 }
@@ -71,7 +68,7 @@ function count(sym) {
   return state.buildings.filter(b => b === sym).length;
 }
 
-/* ========= OBJECTIVES ========= */
+/* ================= OBJECTIVES ================= */
 function renderObjectives() {
   objectives.innerHTML = "";
 
@@ -84,6 +81,7 @@ function renderObjectives() {
     ];
 
     let allOk = true;
+
     goals.forEach(g => {
       const d = document.createElement("div");
       d.className = "obj " + (g.ok ? "ok" : "");
@@ -111,7 +109,7 @@ function renderObjectives() {
   }
 }
 
-/* ========= ERA TRANSITION ========= */
+/* ================= ERA ================= */
 function advanceEra() {
   if (!state.foundationsCompleted) return;
   if (state.prod < 50) return log("Not enough production.");
@@ -120,10 +118,11 @@ function advanceEra() {
   state.era = "bronze";
   MAX_SLOTS = 12;
   log("🏺 The Bronze Age begins.");
+  clamp();
   update();
 }
 
-/* ========= BUILD ========= */
+/* ================= BUILD ================= */
 function canAfford(p, b = 0) {
   return state.prod >= p && state.bronze >= b;
 }
@@ -136,25 +135,29 @@ function build(type) {
     state.pop += 4;
     state.stab -= 6;
     state.buildings.push("🏠");
-  } else if (type === "workshop" && canAfford(20)) {
+  }
+  else if (type === "workshop" && canAfford(20)) {
     state.prod -= 20;
     state.buildings.push("⚒️");
-  } else if (type === "mine" && state.era === "bronze" && canAfford(30)) {
+  }
+  else if (type === "mine" && state.era === "bronze" && canAfford(30)) {
     state.prod -= 30;
     state.stab -= 4;
     state.buildings.push("⛏️");
-  } else if (type === "council" && canAfford(30)) {
+  }
+  else if (type === "council" && canAfford(30)) {
     state.prod -= 30;
     state.stab += 15;
     state.buildings.push("🏛️");
-  } else if (type === "council2" && state.era === "bronze" && canAfford(0, 30)) {
+  }
+  else if (type === "council2" && state.era === "bronze" && canAfford(0, 30)) {
     const i = state.buildings.indexOf("🏛️");
-    if (i !== -1) {
-      state.bronze -= 30;
-      state.stab += 10;
-      state.buildings[i] = "🏛️🏛️";
-    }
-  } else {
+    if (i === -1) return log("Council required.");
+    state.bronze -= 30;
+    state.stab += 10;
+    state.buildings[i] = "🏛️🏛️";
+  }
+  else {
     return log("Not enough resources.");
   }
 
@@ -164,7 +167,7 @@ function build(type) {
   update();
 }
 
-/* ========= REMOVE ========= */
+/* ================= REMOVE ================= */
 function removeBuilding(i) {
   const b = state.buildings[i];
   if (!b) return;
@@ -179,24 +182,31 @@ function removeBuilding(i) {
   update();
 }
 
-/* ========= BUTTONS ========= */
-btnSettlement.onclick = () => build("settlement");
-btnWorkshop.onclick = () => build("workshop");
-btnMine.onclick = () => build("mine");
-btnCouncil.onclick = () => build("council");
-btnCouncil2.onclick = () => build("council2");
+/* ================= BUTTONS ================= */
+if (btnSettlement) btnSettlement.onclick = () => build("settlement");
+if (btnWorkshop) btnWorkshop.onclick = () => build("workshop");
+if (btnMine) btnMine.onclick = () => build("mine");
+if (btnCouncil) btnCouncil.onclick = () => build("council");
+if (btnCouncil2) btnCouncil2.onclick = () => build("council2");
 
-/* ========= TICK ========= */
+/* ================= TICK ================= */
 setInterval(() => {
   state.time++;
 
+  // Production
   state.prod += count("⚒️") * 0.25;
-  if (state.era === "bronze") state.bronze += count("⛏️") * 0.25;
 
+  // Bronze (slow, balanced)
+  if (state.era === "bronze") {
+    state.bronze += count("⛏️") * 0.025 * (1 + count("⚒️") * 0.3);
+  }
+
+  // Stability from population
   if (state.pop < 20) state.stab -= 0.1;
   else if (state.pop >= 25 && state.pop < 30) state.stab += 0.05;
   else if (state.pop >= 30) state.stab += 0.1;
 
+  // Bronze stability timer
   if (state.era === "bronze") {
     if (state.stab >= 85) state.bronzeStabilityTime++;
     else state.bronzeStabilityTime = 0;
@@ -206,7 +216,7 @@ setInterval(() => {
   update();
 }, 1000);
 
-/* ========= RENDER ========= */
+/* ================= RENDER ================= */
 function update() {
   popEl.textContent = state.pop;
   prodEl.textContent = state.prod.toFixed(1);
@@ -214,7 +224,9 @@ function update() {
   stabEl.textContent = state.stab.toFixed(0);
   timeEl.textContent = state.time;
 
-  eraTitle.innerHTML = "<b>" + (state.era === "foundations" ? "Foundations" : "Bronze Age") + "</b>";
+  eraTitle.innerHTML =
+    "<b>" + (state.era === "foundations" ? "Foundations" : "Bronze Age") + "</b>";
+
   eraDesc.textContent =
     state.era === "foundations"
       ? "Fast growth to learn the game."
