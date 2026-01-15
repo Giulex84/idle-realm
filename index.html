@@ -1,15 +1,36 @@
 <script>
-/* ==================================================
-   IDLE REALM — CORE LOGIC
-   ERA 1 + ERA 2 — FROZEN
-   ================================================== */
+/* ======================================
+   IDLE REALM — CORE SCRIPT (SAFE)
+   Compatibile con HTML esistente
+   ====================================== */
 
-let BASE_SLOTS = 9;
-let EXTRA_SLOTS = 0;
-const ACTION_COOLDOWN = 8;
-const BRONZE_TIMER_TARGET = 300; // 5 minutes
+let MAX_SLOTS = 9;
+const COOLDOWN = 8;
+const BRONZE_TIMER_TARGET = 300;
 
-const DEFAULT_STATE = {
+/* ========= DOM MAP ========= */
+const popEl = document.getElementById("pop");
+const prodEl = document.getElementById("prod");
+const bronzeEl = document.getElementById("bronze");
+const stabEl = document.getElementById("stab");
+const timeEl = document.getElementById("time");
+
+const eraTitle = document.getElementById("eraTitle");
+const eraDesc = document.getElementById("eraDesc");
+const objectives = document.getElementById("objectives");
+
+const city = document.getElementById("city");
+const eventsEl = document.getElementById("events");
+const removeHint = document.getElementById("removeHint");
+
+const btnSettlement = document.getElementById("btnSettlement");
+const btnWorkshop = document.getElementById("btnWorkshop");
+const btnMine = document.getElementById("btnMine");
+const btnCouncil = document.getElementById("btnCouncil");
+const btnCouncil2 = document.getElementById("btnCouncil2");
+
+/* ========= STATE ========= */
+const DEFAULT = {
   era: "foundations",
   pop: 12,
   prod: 30,
@@ -17,21 +38,16 @@ const DEFAULT_STATE = {
   stab: 100,
   time: 0,
   lastAction: 0,
-
   buildings: [],
-  events: ["Realm founded."],
-
+  events: ["Realm founded with basic craftsmanship."],
   foundationsCompleted: false,
-  bronzeStabilityTime: 0,
-  bronzeFails: 0
+  bronzeStabilityTime: 0
 };
 
-let state = JSON.parse(localStorage.getItem("idleRealm")) || structuredClone(DEFAULT_STATE);
+let state = JSON.parse(localStorage.getItem("idleRealm"));
+if (!state) state = JSON.parse(JSON.stringify(DEFAULT));
 
-/* =========================
-   UTILITIES
-   ========================= */
-
+/* ========= UTIL ========= */
 function save() {
   localStorage.setItem("idleRealm", JSON.stringify(state));
 }
@@ -47,35 +63,31 @@ function clamp() {
   state.stab = Math.min(100, Math.max(0, state.stab));
 }
 
+function canAct() {
+  return Date.now() - state.lastAction >= COOLDOWN * 1000;
+}
+
 function count(sym) {
   return state.buildings.filter(b => b === sym).length;
 }
 
-function canAct() {
-  return Date.now() - state.lastAction >= ACTION_COOLDOWN * 1000;
-}
-
-/* =========================
-   OBJECTIVES
-   ========================= */
-
+/* ========= OBJECTIVES ========= */
 function renderObjectives() {
   objectives.innerHTML = "";
 
   if (state.era === "foundations") {
     const goals = [
-      { text: "Build 3 Settlements", ok: count("🏠") >= 3 },
-      { text: "Reach 50 Production", ok: state.prod >= 50 },
-      { text: "Establish the Council", ok: state.buildings.includes("🏛️") },
-      { text: "Stability ≥ 70%", ok: state.stab >= 70 }
+      { t: "Build 3 Settlements", ok: count("🏠") >= 3 },
+      { t: "Reach 50 Production", ok: state.prod >= 50 },
+      { t: "Establish the Council", ok: state.buildings.includes("🏛️") },
+      { t: "Stability ≥ 70%", ok: state.stab >= 70 }
     ];
 
     let allOk = true;
-
     goals.forEach(g => {
       const d = document.createElement("div");
       d.className = "obj " + (g.ok ? "ok" : "");
-      d.textContent = (g.ok ? "✓ " : "• ") + g.text;
+      d.textContent = (g.ok ? "✓ " : "• ") + g.t;
       objectives.appendChild(d);
       if (!g.ok) allOk = false;
     });
@@ -90,97 +102,69 @@ function renderObjectives() {
   }
 
   if (state.era === "bronze") {
-    const t = state.bronzeStabilityTime;
     const d = document.createElement("div");
     d.textContent =
-      `Stability ≥ 85% for ${Math.floor(t / 60)}:${(t % 60)
+      `Stability ≥ 85% for ${Math.floor(state.bronzeStabilityTime / 60)}:${(state.bronzeStabilityTime % 60)
         .toString()
         .padStart(2, "0")} / 5:00`;
     objectives.appendChild(d);
   }
 }
 
-/* =========================
-   ERA TRANSITION
-   ========================= */
-
+/* ========= ERA TRANSITION ========= */
 function advanceEra() {
   if (!state.foundationsCompleted) return;
-  if (state.prod < 50) {
-    log("Not enough production to advance.");
-    return;
-  }
+  if (state.prod < 50) return log("Not enough production.");
 
   state.prod -= 50;
   state.era = "bronze";
-  EXTRA_SLOTS = 3;
-  state.lastAction = Date.now();
+  MAX_SLOTS = 12;
   log("🏺 The Bronze Age begins.");
-  clamp();
-  save();
   update();
 }
 
-/* =========================
-   BUILDING COSTS & CHECKS
-   ========================= */
-
-function canAfford(prod, bronze = 0) {
-  return state.prod >= prod && state.bronze >= bronze;
+/* ========= BUILD ========= */
+function canAfford(p, b = 0) {
+  return state.prod >= p && state.bronze >= b;
 }
 
 function build(type) {
   if (!canAct()) return;
 
-  if (type === "settlement") {
-    if (!canAfford(15)) return log("Not enough production.");
+  if (type === "settlement" && canAfford(15)) {
     state.prod -= 15;
     state.pop += 4;
     state.stab -= 6;
     state.buildings.push("🏠");
-  }
-
-  if (type === "workshop") {
-    if (!canAfford(20)) return log("Not enough production.");
+  } else if (type === "workshop" && canAfford(20)) {
     state.prod -= 20;
     state.buildings.push("⚒️");
-  }
-
-  if (type === "mine") {
-    if (state.era !== "bronze") return;
-    if (!canAfford(30)) return log("Not enough production.");
+  } else if (type === "mine" && state.era === "bronze" && canAfford(30)) {
     state.prod -= 30;
     state.stab -= 4;
     state.buildings.push("⛏️");
-  }
-
-  if (type === "council") {
-    if (!canAfford(30)) return log("Not enough production.");
+  } else if (type === "council" && canAfford(30)) {
     state.prod -= 30;
     state.stab += 15;
     state.buildings.push("🏛️");
-  }
-
-  if (type === "council2") {
-    if (state.era !== "bronze") return;
-    if (!canAfford(0, 30)) return log("Not enough bronze.");
+  } else if (type === "council2" && state.era === "bronze" && canAfford(0, 30)) {
     const i = state.buildings.indexOf("🏛️");
-    if (i === -1) return log("Council required.");
-    state.bronze -= 30;
-    state.stab += 10;
-    state.buildings[i] = "🏛️🏛️";
+    if (i !== -1) {
+      state.bronze -= 30;
+      state.stab += 10;
+      state.buildings[i] = "🏛️🏛️";
+    }
+  } else {
+    return log("Not enough resources.");
   }
 
   state.lastAction = Date.now();
   clamp();
-  save();
+  log(type + " built");
   update();
 }
 
-/* =========================
-   REMOVE BUILDINGS
-   ========================= */
-
+/* ========= REMOVE ========= */
 function removeBuilding(i) {
   const b = state.buildings[i];
   if (!b) return;
@@ -191,71 +175,52 @@ function removeBuilding(i) {
 
   state.buildings.splice(i, 1);
   clamp();
-  save();
-  log(b + " removed.");
+  log(b + " removed");
   update();
 }
 
-/* =========================
-   TICK LOOP
-   ========================= */
+/* ========= BUTTONS ========= */
+btnSettlement.onclick = () => build("settlement");
+btnWorkshop.onclick = () => build("workshop");
+btnMine.onclick = () => build("mine");
+btnCouncil.onclick = () => build("council");
+btnCouncil2.onclick = () => build("council2");
 
+/* ========= TICK ========= */
 setInterval(() => {
   state.time++;
 
-  // Production
   state.prod += count("⚒️") * 0.25;
+  if (state.era === "bronze") state.bronze += count("⛏️") * 0.25;
 
-  // Bronze
-  if (state.era === "bronze") {
-    state.bronze += count("⛏️") * 0.25;
-  }
-
-  // Stability from population
   if (state.pop < 20) state.stab -= 0.1;
   else if (state.pop >= 25 && state.pop < 30) state.stab += 0.05;
   else if (state.pop >= 30) state.stab += 0.1;
 
-  // Bronze stability timer
   if (state.era === "bronze") {
-    if (state.stab >= 85) {
-      state.bronzeStabilityTime++;
-    } else {
-      if (state.bronzeStabilityTime > 0) {
-        state.bronzeFails++;
-        log("⚠️ Stability faltered. The council struggles to hold order.");
-      }
-      state.bronzeStabilityTime = 0;
-    }
+    if (state.stab >= 85) state.bronzeStabilityTime++;
+    else state.bronzeStabilityTime = 0;
   }
 
   clamp();
-  save();
   update();
 }, 1000);
 
-/* =========================
-   RENDER
-   ========================= */
-
+/* ========= RENDER ========= */
 function update() {
-  pop.textContent = state.pop;
-  prod.textContent = state.prod.toFixed(1);
-  bronze.textContent = state.bronze.toFixed(1);
-  stab.textContent = state.stab.toFixed(0);
-  time.textContent = state.time;
+  popEl.textContent = state.pop;
+  prodEl.textContent = state.prod.toFixed(1);
+  bronzeEl.textContent = state.bronze.toFixed(1);
+  stabEl.textContent = state.stab.toFixed(0);
+  timeEl.textContent = state.time;
 
-  eraTitle.innerHTML =
-    "<b>" + (state.era === "foundations" ? "Foundations" : "Bronze Age") + "</b>";
-
+  eraTitle.innerHTML = "<b>" + (state.era === "foundations" ? "Foundations" : "Bronze Age") + "</b>";
   eraDesc.textContent =
     state.era === "foundations"
       ? "Fast growth to learn the game."
       : "A society tested by governance and time.";
 
   city.innerHTML = "";
-  const slots = BASE_SLOTS + (state.era === "bronze" ? EXTRA_SLOTS : 0);
-
   state.buildings.forEach((b, i) => {
     const d = document.createElement("div");
     d.className = "tile";
@@ -264,14 +229,15 @@ function update() {
     city.appendChild(d);
   });
 
-  for (let i = state.buildings.length; i < slots; i++) {
+  for (let i = state.buildings.length; i < MAX_SLOTS; i++) {
     const d = document.createElement("div");
     d.className = "tile";
     city.appendChild(d);
   }
 
-  events.innerHTML = state.events.map(e => `<div>${e}</div>`).join("");
+  eventsEl.innerHTML = state.events.map(e => `<div>${e}</div>`).join("");
   renderObjectives();
+  save();
 }
 
 update();
