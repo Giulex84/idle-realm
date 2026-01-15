@@ -99,7 +99,7 @@ const COST = {
 };
 
 const DEFAULT = {
-  v:3,
+  v:4,
   era:"foundations",
   pop:12,
   prod:30,
@@ -111,7 +111,7 @@ const DEFAULT = {
   lastSeen:Date.now(),
   buildings:["⚒️"],
   councilLv:1,
-  objTime:[0,0,0],
+  stableTime:0,
   events:["• Realm founded with basic craftsmanship"]
 };
 
@@ -169,7 +169,7 @@ function eraObjectives(){
     ];
   }
   return [
-    ["Stability ≥ 85% (sustained)", state.objTime[0]>=600],
+    ["Stability ≥ 85% (sustained)", state.stableTime>=600],
     ["Bronze ≥ 75", state.bronze>=75],
     ["Council II established", state.councilLv===2]
   ];
@@ -244,6 +244,11 @@ function remove(i){
   if(state.era!=="bronze") return;
   const b = state.buildings[i];
   if(!b || b==="🏛️") return;
+
+  if(b==="🏠"){
+    state.pop = Math.max(0, state.pop - 4);
+  }
+
   state.buildings.splice(i,1);
   log(b+" removed");
   act(); update();
@@ -304,10 +309,15 @@ setInterval(()=>{
     state.stab += state.councilLv===2 ? 0.08 : 0.05;
   }
 
-  if(state.era==="bronze" && state.stab>=85){
-    state.objTime[0]++;
+  if(state.era==="bronze"){
+    if(state.stab >= 85){
+      state.stableTime++;
+    }else{
+      state.stableTime = 0;
+    }
   }
 
+  state.stab = Math.max(0, Math.min(100, state.stab));
   update();
 },1000);
 
