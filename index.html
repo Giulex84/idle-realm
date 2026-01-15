@@ -53,8 +53,6 @@ button:disabled{opacity:.4}
 <h1>Idle Realm</h1>
 <div class="small">A living world shaped by time and choices</div>
 
-<div id="offlineNotice"></div>
-
 <div class="card">
   <h2>Era</h2>
   <div id="eraTitle"></div>
@@ -70,6 +68,7 @@ button:disabled{opacity:.4}
   <button id="btnSettle">🏠 Settlement</button>
   <button id="btnWork">⚒️ Workshop</button>
   <button id="btnCouncil">🏛️ Council</button>
+  <button id="btnCouncil2" style="display:none">🏛️ Council II</button>
   <button id="btnMine" style="display:none">⛏️ Mine</button>
   <button id="btnSmelt" style="display:none">🔥 Smelter</button>
   <div class="small" id="info"></div>
@@ -97,10 +96,12 @@ const COST={
   settlement:15,
   workshop:20,
   council:30,
+  council2:50,
   mine:25,
   smelter:35
 };
 
+/* ===== DEFAULT ===== */
 const DEFAULT={
   era:"foundations",
   pop:12,
@@ -110,15 +111,16 @@ const DEFAULT={
   stab:100,
   time:0,
   lastAction:0,
-  lastSeen:Date.now(),
   buildings:["⚒️"],
-  events:["• Realm founded with basic craftsmanship"]
+  councilLv:1,
+  events:["• Realm founded with basic craftsmanship"],
+  objTime:[0,0,0]
 };
 
-let state=loadState();
+let state=load();
 
 /* ===== LOAD / SAVE ===== */
-function loadState(){
+function load(){
   try{
     const s=JSON.parse(localStorage.getItem("idleRealm"));
     if(!s) return structuredClone(DEFAULT);
@@ -126,15 +128,14 @@ function loadState(){
   }catch{return structuredClone(DEFAULT)}
 }
 function save(){
-  state.lastSeen=Date.now();
   localStorage.setItem("idleRealm",JSON.stringify(state));
+}
+function canAct(){
+  return Date.now()-state.lastAction>=COOLDOWN*1000;
 }
 function log(msg){
   state.events.unshift("• "+msg);
   state.events=state.events.slice(0,10);
-}
-function canAct(){
-  return Date.now()-state.lastAction>=COOLDOWN*1000;
 }
 
 /* ===== ERA OBJECTIVES ===== */
@@ -148,21 +149,18 @@ function eraObjectives(){
     ];
   }
   return [
-    ["Stability ≥ 85%",state.stab>=85],
-    ["Accumulate 15 Bronze",state.bronze>=15],
-    ["Council + Mine + Smelter",
-      state.buildings.includes("🏛️") &&
-      state.buildings.includes("⛏️") &&
-      state.buildings.includes("🔥")]
+    ["Stability ≥ 85%", state.objTime[0]>=300],
+    ["Sustain Bronze Flow", state.objTime[1]>=600],
+    ["Govern a Growing Society", state.objTime[2]>=480]
   ];
 }
 
 /* ===== UPDATE ===== */
 function update(){
-  pop.innerText=state.pop.toFixed(0);
+  pop.innerText=state.pop;
   prod.innerText=state.prod.toFixed(1);
   bronze.innerText=state.bronze.toFixed(2);
-  stab.innerText=Math.max(0,Math.min(100,state.stab)).toFixed(0);
+  stab.innerText=Math.round(state.stab);
   time.innerText=state.time;
 
   eraTitle.innerHTML=state.era==="foundations"?"<b>Foundations</b>":"<b>Bronze Age</b>";
@@ -184,12 +182,17 @@ function update(){
 
   btnMine.style.display = btnSmelt.style.display =
     state.era==="bronze" ? "block":"none";
+  btnCouncil2.style.display =
+    state.era==="bronze" && state.councilLv===1 && state.buildings.includes("🏛️")
+      ? "block":"none";
 
   const cd=Math.max(0,Math.ceil((COOLDOWN*1000-(Date.now()-state.lastAction))/1000));
   info.innerText =
     `Settlement ${COST.settlement} | Workshop ${COST.workshop} | Council ${COST.council}`+
-    (state.era==="bronze" ? ` | Mine ${COST.mine} | Smelter ${COST.smelter}` : "")+
-    (canAct() ? " • Ready" : ` • Cooldown ${cd}s`);
+    (state.era==="bronze"
+      ? ` | Mine ${COST.mine} | Smelter ${COST.smelter} | Council II ${COST.council2}`
+      : "")+
+    (canAct()?" • Ready":` • Cooldown ${cd}s`);
 
   city.innerHTML="";
   for(let i=0;i<MAX_SLOTS;i++){
@@ -200,15 +203,15 @@ function update(){
     city.appendChild(t);
   }
 
-  advisor.innerText = advisorText();
+  advisor.innerText=advisorText();
   events.innerHTML=state.events.map(e=>`<div>${e}</div>`).join("");
   save();
 }
 
-/* ===== BUILD / REMOVE ===== */
+/* ===== ACTIONS ===== */
 function build(type,icon){
   if(!canAct()) return;
-  if(state.prod < COST[type]) return;
+  if(state.prod<COST[type]) return;
   if(state.buildings.length>=MAX_SLOTS) return;
 
   state.prod-=COST[type];
@@ -219,12 +222,11 @@ function build(type,icon){
   state.lastAction=Date.now();
   update();
 }
-
 function tryRemove(i){
   if(state.era!=="bronze") return;
   if(!state.buildings.includes("🏛️")) return;
   const b=state.buildings[i];
-  if(!b || b==="🏛️") return;
+  if(!b||b==="🏛️") return;
   state.buildings.splice(i,1);
   log(b+" removed");
   state.lastAction=Date.now();
@@ -237,6 +239,14 @@ btnWork.onclick=()=>build("workshop","⚒️");
 btnCouncil.onclick=()=>build("council","🏛️");
 btnMine.onclick=()=>build("mine","⛏️");
 btnSmelt.onclick=()=>build("smelter","🔥");
+btnCouncil2.onclick=()=>{
+  if(!canAct()||state.prod<COST.council2) return;
+  state.prod-=COST.council2;
+  state.councilLv=2;
+  log("Council strengthened");
+  state.lastAction=Date.now();
+  update();
+};
 
 /* ===== ERA TRANSITION ===== */
 advanceEra.onclick=()=>{
@@ -256,37 +266,46 @@ setInterval(()=>{
   const s=state.buildings.filter(b=>b==="🔥").length;
   const hasCouncil=state.buildings.includes("🏛️");
 
-  /* Production (slightly reduced scaling) */
+  /* Production */
   state.prod+=w*0.22;
 
-  /* Ore & Bronze (slower, always >0) */
+  /* Ore & Bronze */
   state.ore+=m*0.15*(state.stab>70?1:0.6);
-  const eff=hasCouncil?0.7:0.4;
   const used=Math.min(state.ore,s*0.08);
-  state.bronze+=used*eff;
+  state.bronze+=used*(hasCouncil?0.7:0.4);
   state.ore-=used;
 
-  /* Stability: reacts only if overstretched */
-  let pressure = Math.max(0,(w+m+s)-3);
+  /* Stability with population inertia */
+  let pressure=Math.max(0,(w+m+s)-3);
+  let inertia=1+(Math.max(0,state.pop-20)/20);
   if(pressure>0){
-    let upkeep=pressure*0.05;
-    if(hasCouncil) upkeep*=0.5;
-    state.stab-=upkeep;
+    let loss=pressure*0.04/inertia;
+    if(hasCouncil) loss*=0.5;
+    state.stab-=loss;
   }
+  if(state.stab<100) state.stab+=0.03/inertia;
 
-  if(state.stab<100) state.stab+=0.03;
+  /* === OBJECTIVE TIMERS (ERA 2) === */
+  if(state.era==="bronze"){
+    let speed=1/(1+(Math.max(0,state.pop-20)/20));
+    if(state.councilLv===2) speed*=1.3;
+
+    if(state.stab>=85) state.objTime[0]+=speed;
+    if(state.bronze>0 && state.stab>=75) state.objTime[1]+=speed;
+    if(hasCouncil && (w+m+s)>=4 && state.stab>=80) state.objTime[2]+=speed;
+  }
 
   update();
 },1000);
 
-update();
-
 function advisorText(){
-  if(state.stab<70) return "Unchecked growth strains even loyal people.";
-  if(state.era==="bronze" && state.bronze<5) return "Bronze takes patience, not force.";
-  if(!state.buildings.includes("🏛️")) return "Guidance prevents waste.";
-  return "A stable realm grows, even slowly.";
+  if(state.era==="bronze" && state.councilLv===1)
+    return "Stronger institutions make governance easier.";
+  if(state.stab<70) return "A large society reacts slowly to instability.";
+  return "Time reveals the strength of a realm.";
 }
+
+update();
 </script>
 </body>
 </html>
