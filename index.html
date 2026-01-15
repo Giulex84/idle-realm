@@ -57,9 +57,7 @@ button:disabled{opacity:.4}
   <div id="eraTitle"></div>
   <div id="eraDesc" class="small"></div>
   <div id="objectives"></div>
-  <button id="advanceEra" class="bronze" style="display:none">
-    🥉 Enter the Bronze Age (50 ⚒️)
-  </button>
+  <button id="advanceEra" class="bronze" style="display:none"></button>
 </div>
 
 <div class="card">
@@ -89,6 +87,7 @@ button:disabled{opacity:.4}
 let MAX_SLOTS = 9;
 const COOLDOWN = 8;
 const ERA2_COST = 50;
+const ERA3_COST = 75;
 const CALM_TIME = 30;
 
 const COST = {
@@ -99,7 +98,7 @@ const COST = {
 };
 
 const DEFAULT = {
-  v:3,
+  v:4,
   era:"foundations",
   pop:12,
   prod:30,
@@ -119,19 +118,18 @@ let state = load();
 
 /* ===== HELPERS ===== */
 function $(id){ return document.getElementById(id); }
-
 function clamp(){
-  state.pop = Math.max(0,state.pop);
-  state.prod = Math.max(0,state.prod);
-  state.bronze = Math.max(0,state.bronze);
-  state.stab = Math.max(0,Math.min(100,state.stab));
+  state.pop=Math.max(0,state.pop);
+  state.prod=Math.max(0,state.prod);
+  state.bronze=Math.max(0,state.bronze);
+  state.stab=Math.max(0,Math.min(100,state.stab));
 }
 
 /* ===== LOAD / SAVE ===== */
 function load(){
   try{
-    const s = JSON.parse(localStorage.getItem("idleRealm"));
-    if(!s || s.v!==DEFAULT.v) throw 0;
+    const s=JSON.parse(localStorage.getItem("idleRealm"));
+    if(!s||s.v!==DEFAULT.v) throw 0;
     return Object.assign(structuredClone(DEFAULT),s);
   }catch{
     localStorage.removeItem("idleRealm");
@@ -150,20 +148,6 @@ function log(msg){
   state.events=state.events.slice(0,10);
 }
 
-/* ===== OFFLINE ===== */
-(function(){
-  const elapsed=Math.floor((Date.now()-state.lastSeen)/1000);
-  if(elapsed<5) return;
-  const eff=Math.min(elapsed,state.era==="foundations"?300:600);
-  const w=state.buildings.filter(b=>"⚒️"===b).length;
-  const m=state.buildings.filter(b=>"⛏️"===b).length;
-  state.time+=eff;
-  state.prod+=w*0.22*eff;
-  state.bronze+=m*0.05*eff;
-  clamp();
-  log("Offline progress: +"+eff+"s");
-})();
-
 /* ===== OBJECTIVES ===== */
 function eraObjectives(){
   if(state.era==="foundations"){
@@ -174,25 +158,43 @@ function eraObjectives(){
       ["Stability ≥ 70%",state.stab>=70]
     ];
   }
+  if(state.era==="bronze"){
+    return [
+      ["Stability ≥ 85% (sustained)",state.objTime[0]>=300],
+      ["Bronze ≥ 75",state.bronze>=75],
+      ["Council II established",state.councilLv===2]
+    ];
+  }
   return [
-    ["Stability ≥ 85% (sustained)",state.objTime[0]>=300],
-    ["Bronze ≥ 75",state.bronze>=75],
-    ["Council II established",state.councilLv===2]
+    ["The Iron Age has begun",true]
   ];
 }
 
 /* ===== UPDATE ===== */
 function update(){
-  if($("pop")) $("pop").innerText=state.pop;
-  if($("prod")) $("prod").innerText=state.prod.toFixed(1);
-  if($("bronze")) $("bronze").innerText=state.bronze.toFixed(1);
-  if($("stab")) $("stab").innerText=Math.round(state.stab);
-  if($("time")) $("time").innerText=state.time;
+  $("pop").innerText=state.pop;
+  $("prod").innerText=state.prod.toFixed(1);
+  $("bronze").innerText=state.bronze.toFixed(1);
+  $("stab").innerText=Math.round(state.stab);
+  $("time").innerText=state.time;
 
-  $("eraTitle").innerHTML=state.era==="foundations"?"<b>Foundations</b>":"<b>Bronze Age</b>";
-  $("eraDesc").innerText=state.era==="foundations"
-    ?"Fast growth to understand the game."
-    :"Growth slows. Governance matters.";
+  if(state.era==="foundations"){
+    $("eraTitle").innerHTML="<b>Foundations</b>";
+    $("eraDesc").innerText="Fast growth to understand the game.";
+    $("advanceEra").innerText="🥉 Enter the Bronze Age (50 ⚒️)";
+    $("advanceEra").style.display=eraObjectives().every(o=>o[1])?"block":"none";
+  }
+  else if(state.era==="bronze"){
+    $("eraTitle").innerHTML="<b>Bronze Age</b>";
+    $("eraDesc").innerText="Growth slows. Governance matters.";
+    $("advanceEra").innerText="⚔️ Enter the Iron Age (75 🥉)";
+    $("advanceEra").style.display=eraObjectives().every(o=>o[1])?"block":"none";
+  }
+  else{
+    $("eraTitle").innerHTML="<b>Iron Age</b>";
+    $("eraDesc").innerText="A new era of power, conflict and structure.";
+    $("advanceEra").style.display="none";
+  }
 
   $("objectives").innerHTML="";
   eraObjectives().forEach(o=>{
@@ -202,15 +204,12 @@ function update(){
     $("objectives").appendChild(d);
   });
 
-  $("advanceEra").style.display=
-    state.era==="foundations"&&eraObjectives().every(o=>o[1])?"block":"none";
-
   $("btnMine").style.display=$("btnCouncil2").style.display=
     state.era==="bronze"?"block":"none";
 
   $("info").innerText=
     `Settlement ${COST.settlement} | Workshop ${COST.workshop} | Council ${COST.council}`+
-    (state.era==="bronze"?" | Mine 25":"")+
+    (state.era!=="foundations"?" | Mine 25":"")+
     (canAct()?" • Ready":"");
 
   $("city").innerHTML="";
@@ -228,10 +227,7 @@ function update(){
 }
 
 /* ===== ACTIONS ===== */
-function act(){
-  state.lastAction=Date.now();
-  state.lastChange=Date.now();
-}
+function act(){state.lastAction=Date.now();state.lastChange=Date.now();}
 function build(type,icon){
   if(!canAct()||state.prod<COST[type]||state.buildings.length>=MAX_SLOTS) return;
   state.prod-=COST[type];
@@ -260,13 +256,20 @@ $("btnCouncil2").onclick=()=>{
   clamp();log("Council II established");act();update();
 };
 
-/* ===== ERA ===== */
+/* ===== ERA TRANSITION ===== */
 $("advanceEra").onclick=()=>{
-  if(state.prod<ERA2_COST) return;
-  state.prod-=ERA2_COST;
-  state.era="bronze";
-  MAX_SLOTS=12;
-  clamp();log("The Bronze Age begins");act();update();
+  if(state.era==="foundations"&&state.prod>=ERA2_COST){
+    state.prod-=ERA2_COST;
+    state.era="bronze";
+    MAX_SLOTS=12;
+    log("The Bronze Age begins");
+  }
+  else if(state.era==="bronze"&&state.bronze>=ERA3_COST){
+    state.bronze-=ERA3_COST;
+    state.era="iron";
+    log("The Iron Age begins");
+  }
+  act();clamp();update();
 };
 
 /* ===== TICK ===== */
@@ -307,6 +310,7 @@ setInterval(()=>{
 },1000);
 
 function advisorText(){
+  if(state.era==="iron") return "Power reshapes the realm. Old rules no longer suffice.";
   if(state.pop<20) return "A young society struggles to govern itself.";
   if(state.pop<30) return "Population absorbs pressure, but growth is fragile.";
   if(state.stab<85) return "Governance requires patience.";
