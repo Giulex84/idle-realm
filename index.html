@@ -28,7 +28,6 @@ header{
 main{padding:16px;max-width:500px;margin:auto}
 .card{background:linear-gradient(180deg,var(--card),var(--card2));border-radius:16px;padding:16px;margin-bottom:16px}
 button{width:100%;border:none;border-radius:14px;padding:14px;margin-bottom:10px;background:var(--accent);color:white;font-size:16px}
-button.bronze{background:linear-gradient(180deg,#e0a24c,#b87328);color:#1a0f00;font-weight:600}
 button.iron{background:linear-gradient(180deg,#cfd4da,#7b8188);color:#0b0f14;font-weight:600}
 button:disabled{opacity:.4}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -37,21 +36,8 @@ button:disabled{opacity:.4}
 .obj{font-size:14px;margin-bottom:4px}
 .obj.ok{color:var(--ok)}
 .advisor{font-size:12px;color:#aab3ff;margin-top:10px;text-align:center}
-
-/* sustained bar */
-.bar{
-  height:8px;
-  background:#0b1228;
-  border-radius:6px;
-  overflow:hidden;
-  margin-top:6px;
-}
-.bar > div{
-  height:100%;
-  background:var(--ok);
-  width:0%;
-  transition:width .3s;
-}
+.bar{height:8px;background:#0b1228;border-radius:6px;overflow:hidden;margin-top:6px}
+.bar>div{height:100%;background:var(--ok);width:0%;transition:width .3s}
 </style>
 </head>
 
@@ -75,7 +61,7 @@ button:disabled{opacity:.4}
   <div id="eraDesc" class="small"></div>
   <div id="objectives"></div>
 
-  <div id="sustainBox" style="display:none">
+  <div id="sustainBox">
     <div class="small">Stability sustained</div>
     <div class="bar"><div id="sustainBar"></div></div>
   </div>
@@ -92,7 +78,6 @@ button:disabled{opacity:.4}
   <button id="btnCouncil">🏛️ Council</button>
   <button id="btnCouncil2">🏛️ Council II</button>
   <button id="btnMine">⛏️ Mine</button>
-
   <div class="small" id="info"></div>
 </div>
 
@@ -110,19 +95,14 @@ button:disabled{opacity:.4}
 
 <script>
 /* ===== CONFIG ===== */
-const SLOT_BY_ERA={foundations:9,bronze:12,iron:15};
+const SLOT_BY_ERA={bronze:12};
 const ERA3_COST=75;
 const COOLDOWN=8;
 
-const COST={
-  settlement:15,
-  workshop:20,
-  council:30,
-  mine:25
-};
+const COST={settlement:15,workshop:20,council:30,mine:25};
 
 const DEFAULT={
-  v:10,
+  v:11,
   era:"bronze",
   pop:12,
   prod:30,
@@ -140,9 +120,9 @@ const DEFAULT={
 let state=load();
 
 /* ===== HELPERS ===== */
-function $(id){return document.getElementById(id);}
-function maxSlots(){return SLOT_BY_ERA[state.era];}
-function clamp(){state.stab=Math.max(0,Math.min(100,state.stab));}
+const $=id=>document.getElementById(id);
+const maxSlots=()=>SLOT_BY_ERA[state.era];
+const clamp=()=>state.stab=Math.max(0,Math.min(100,state.stab));
 
 /* ===== LOAD / SAVE ===== */
 function load(){
@@ -155,23 +135,20 @@ function load(){
     return structuredClone(DEFAULT);
   }
 }
-function save(){localStorage.setItem("idleRealm",JSON.stringify(state));}
-function canAct(){return Date.now()-state.lastAction>=COOLDOWN*1000;}
-function log(msg){
-  state.events.unshift("• "+msg);
-  state.events=state.events.slice(0,10);
-}
+const save=()=>localStorage.setItem("idleRealm",JSON.stringify(state));
+const canAct=()=>Date.now()-state.lastAction>=COOLDOWN*1000;
+const log=m=>(state.events.unshift("• "+m),state.events=state.events.slice(0,10));
 
 /* ===== UPDATE ===== */
 function update(){
-  pop.innerText=state.pop;
-  prod.innerText=state.prod.toFixed(1);
-  bronze.innerText=state.bronze.toFixed(1);
-  stab.innerText=Math.round(state.stab);
-  time.innerText=state.time;
+  pop.textContent=state.pop;
+  prod.textContent=state.prod.toFixed(1);
+  bronze.textContent=state.bronze.toFixed(1);
+  stab.textContent=Math.round(state.stab);
+  time.textContent=state.time;
 
   eraTitle.innerHTML="<b>Bronze Age</b>";
-  eraDesc.innerText="Governance stabilizes growing societies.";
+  eraDesc.textContent="Governance stabilizes growing societies.";
 
   objectives.innerHTML=`
     <div class="obj ${state.sustain>=300?"ok":""}">✔ Stability ≥ 75% (sustained)</div>
@@ -179,52 +156,47 @@ function update(){
     <div class="obj ${state.councilLv===2?"ok":""}">✔ Council II established</div>
   `;
 
-  sustainBox.style.display="block";
   sustainBar.style.width=Math.min(100,state.sustain/300*100)+"%";
 
   advanceEra.style.display=
-    state.sustain>=300 && state.bronze>=75 && state.councilLv===2
-      ? "block":"none";
+    state.sustain>=300&&state.bronze>=75&&state.councilLv===2?"block":"none";
 
-  info.innerText=
-    `🏠 ${COST.settlement} ⚒️ | ⚒️ ${COST.workshop} ⚒️ | 🏛️ ${COST.council} ⚒️ | ⛏️ 25 ⚒️ | 🏛️ II 30 🥉`;
+  info.textContent=
+    "🏠 15 ⚒️ | ⚒️ 20 ⚒️ | 🏛️ 30 ⚒️ | ⛏️ 25 ⚒️ | 🏛️ II 30 🥉";
 
   city.innerHTML="";
   for(let i=0;i<maxSlots();i++){
     const t=document.createElement("div");
     t.className="tile";
-    t.innerText=state.buildings[i]||"⬜";
+    t.textContent=state.buildings[i]||"⬜";
     t.onclick=()=>remove(i);
     city.appendChild(t);
   }
 
-  advisor.innerText="The state asserts its authority.";
+  advisor.textContent=
+    state.councilLv===2?"The state asserts its authority.":"Governance is fragile.";
+
   events.innerHTML=state.events.map(e=>`<div>${e}</div>`).join("");
   save();
 }
 
 /* ===== ACTIONS ===== */
-function act(){state.lastAction=Date.now();}
+const act=()=>state.lastAction=Date.now();
 function build(type,icon){
   if(!canAct()||state.prod<COST[type]||state.buildings.length>=maxSlots()) return;
   if(type==="council"&&state.councilLv>0) return;
-
   state.prod-=COST[type];
   state.buildings.push(icon);
-
-  if(type==="council") state.councilLv=1;
   if(type==="settlement") state.pop+=4;
-
-  log(icon+" constructed");
-  act();update();
+  if(type==="council") state.councilLv=1;
+  log(icon+" constructed");act();update();
 }
-function remove(i){
+const remove=i=>{
   const b=state.buildings[i];
   if(!b) return;
   state.buildings.splice(i,1);
-  log(b+" removed");
-  act();update();
-}
+  log(b+" removed");act();update();
+};
 
 /* ===== BUTTONS ===== */
 btnSettle.onclick=()=>build("settlement","🏠");
@@ -233,32 +205,40 @@ btnCouncil.onclick=()=>build("council","🏛️");
 btnMine.onclick=()=>build("mine","⛏️");
 btnCouncil2.onclick=()=>{
   if(!canAct()||state.councilLv!==1||state.bronze<30) return;
-  state.bronze-=30;
-  state.councilLv=2;
-  log("Council II established");
-  act();update();
+  state.bronze-=30;state.councilLv=2;
+  log("Council II established");act();update();
 };
-
 advanceEra.onclick=()=>{
   if(state.bronze<ERA3_COST) return;
-  state.bronze-=ERA3_COST;
-  state.era="iron";
-  log("The Iron Age begins");
-  act();update();
+  state.bronze-=ERA3_COST;state.era="iron";
+  log("The Iron Age begins");act();update();
 };
 
 /* ===== TICK ===== */
 setInterval(()=>{
   state.time++;
+
   const w=state.buildings.filter(b=>b==="⚒️").length;
   const m=state.buildings.filter(b=>b==="⛏️").length;
 
   state.prod+=w*0.22;
   state.bronze+=m*0.05;
 
-  if(state.stab>=75) state.sustain++;
-  else state.sustain=0;
+  /* pressure */
+  let loss=w*0.04+m*0.05;
+  if(state.councilLv===2) loss*=0.6;
+  state.stab-=loss;
 
+  /* recovery */
+  let rec=0;
+  if(state.pop>=20) rec=0.02;
+  if(state.pop>=30) rec=0.05;
+  if(state.councilLv===1) rec*=1.3;
+  if(state.councilLv===2) rec*=1.8;
+
+  state.stab+=rec;
+
+  if(state.stab>=75) state.sustain++; else state.sustain=0;
   clamp();update();
 },1000);
 
