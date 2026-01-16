@@ -107,7 +107,7 @@ const COST = {
 };
 
 const DEFAULT = {
-  v:7,
+  v:8,
   era:"foundations",
   pop:12,
   prod:30,
@@ -236,7 +236,6 @@ function update(){
 function act(){state.lastAction=Date.now();state.lastChange=Date.now();}
 function build(type,icon){
   if(!canAct()||state.prod<COST[type]||state.buildings.length>=maxSlots()) return;
-
   if(type==="council" && state.councilLv>0) return;
 
   state.prod-=COST[type];
@@ -244,12 +243,12 @@ function build(type,icon){
   if(type==="council"){
     state.councilLv=1;
     state.buildings.push("🏛️");
+    state.stab+=15;
   }else{
     state.buildings.push(icon);
   }
 
   if(type==="settlement"){state.pop+=4;state.stab-=6;}
-  if(type==="council"){state.stab+=15;}
 
   clamp();log(icon+" constructed");act();update();
 }
@@ -296,6 +295,7 @@ $("advanceEra").onclick=()=>{
 setInterval(()=>{
   try{
     state.time++;
+
     const w=state.buildings.filter(b=>b==="⚒️").length;
     const m=state.buildings.filter(b=>b==="⛏️").length;
     const f=state.buildings.filter(b=>b==="🏗️").length;
@@ -305,8 +305,15 @@ setInterval(()=>{
     state.prod+=w*0.22+f*0.18;
     state.bronze+=m*0.05;
 
-    if(state.pop>=40) state.stab+=0.08;
-    else if(state.pop>=30) state.stab+=0.04;
+    /* === GOVERNANCE RECOVERY === */
+    if(state.era==="bronze"){
+      if(state.pop>=32) state.stab+=0.09;
+      else if(state.pop>=30) state.stab+=0.05;
+    }
+    if(state.era==="iron"){
+      if(state.pop>=40) state.stab+=0.08;
+      else if(state.pop>=30) state.stab+=0.04;
+    }
 
     let pressure=Math.max(0,(w+m+f)-3);
     if(state.era==="iron") pressure+=Math.floor(state.pop/20);
