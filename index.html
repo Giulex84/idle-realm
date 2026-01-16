@@ -11,9 +11,11 @@
   --card2:#1b2546;
   --accent:#2f6bff;
   --bronze:#c27c2c;
+  --iron:#9aa0a6;
   --text:#e6ecff;
   --muted:#9aa4c7;
   --ok:#22c55e;
+  --warn:#f59e0b;
 }
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
 body{margin:0;background:linear-gradient(180deg,#0a1020,#050a14);color:var(--text)}
@@ -28,12 +30,14 @@ main{padding:16px;max-width:500px;margin:auto}
 .card{background:linear-gradient(180deg,var(--card),var(--card2));border-radius:16px;padding:16px;margin-bottom:16px}
 button{width:100%;border:none;border-radius:14px;padding:14px;margin-bottom:10px;background:var(--accent);color:white;font-size:16px}
 button.bronze{background:linear-gradient(180deg,#e0a24c,#b87328);color:#1a0f00;font-weight:600}
+button.iron{background:linear-gradient(180deg,#cfd4da,#7b8188);color:#0b0f14;font-weight:600}
 button:disabled{opacity:.4}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.tile{background:#0f1730;border-radius:12px;height:70px;display:flex;align-items:center;justify-content:center;font-size:28px}
+.tile{background:#0f1730;border-radius:12px;height:70px;display:flex;align-items:center;justify-content:center;font-size:26px}
 .small{font-size:13px;color:var(--muted)}
 .obj{font-size:14px;margin-bottom:4px}
 .obj.ok{color:var(--ok)}
+.obj.warn{color:var(--warn)}
 .advisor{font-size:12px;color:#aab3ff;margin-top:10px;text-align:center}
 </style>
 </head>
@@ -57,7 +61,7 @@ button:disabled{opacity:.4}
   <div id="eraTitle"></div>
   <div id="eraDesc" class="small"></div>
   <div id="objectives"></div>
-  <button id="advanceEra" class="bronze" style="display:none"></button>
+  <button id="advanceEra" style="display:none"></button>
 </div>
 
 <div class="card">
@@ -67,6 +71,12 @@ button:disabled{opacity:.4}
   <button id="btnCouncil">🏛️ Council</button>
   <button id="btnCouncil2" style="display:none">🏛️ Council II (30 🥉)</button>
   <button id="btnMine" style="display:none">⛏️ Mine</button>
+
+  <!-- IRON AGE -->
+  <button id="btnBarracks" style="display:none">⚔️ Barracks</button>
+  <button id="btnForge" style="display:none">🏗️ Forge</button>
+  <button id="btnArchive" style="display:none">📜 Archive</button>
+
   <div class="small" id="info"></div>
 </div>
 
@@ -94,11 +104,14 @@ const COST = {
   settlement:15,
   workshop:20,
   council:30,
-  mine:25
+  mine:25,
+  barracks:40,
+  forge:50,
+  archive:45
 };
 
 const DEFAULT = {
-  v:4,
+  v:5,
   era:"foundations",
   pop:12,
   prod:30,
@@ -110,14 +123,14 @@ const DEFAULT = {
   lastSeen:Date.now(),
   buildings:["⚒️"],
   councilLv:1,
-  objTime:[0],
+  objTime:[0,0,0],
   events:["• Realm founded with basic craftsmanship"]
 };
 
 let state = load();
 
 /* ===== HELPERS ===== */
-function $(id){ return document.getElementById(id); }
+function $(id){return document.getElementById(id);}
 function clamp(){
   state.pop=Math.max(0,state.pop);
   state.prod=Math.max(0,state.prod);
@@ -140,9 +153,7 @@ function save(){
   state.lastSeen=Date.now();
   localStorage.setItem("idleRealm",JSON.stringify(state));
 }
-function canAct(){
-  return Date.now()-state.lastAction>=COOLDOWN*1000;
-}
+function canAct(){return Date.now()-state.lastAction>=COOLDOWN*1000;}
 function log(msg){
   state.events.unshift("• "+msg);
   state.events=state.events.slice(0,10);
@@ -166,7 +177,10 @@ function eraObjectives(){
     ];
   }
   return [
-    ["The Iron Age has begun",true]
+    ["Reach Population 50",state.pop>=50],
+    ["Build 2 Forges",state.buildings.filter(b=>b==="🏗️").length>=2],
+    ["Stability ≥ 80% (5 min)",state.objTime[1]>=300],
+    ["Stability ≥ 90% (10 min)",state.objTime[2]>=600]
   ];
 }
 
@@ -181,20 +195,23 @@ function update(){
   if(state.era==="foundations"){
     $("eraTitle").innerHTML="<b>Foundations</b>";
     $("eraDesc").innerText="Fast growth to understand the game.";
+    $("advanceEra").className="bronze";
     $("advanceEra").innerText="🥉 Enter the Bronze Age (50 ⚒️)";
-    $("advanceEra").style.display=eraObjectives().every(o=>o[1])?"block":"none";
   }
   else if(state.era==="bronze"){
     $("eraTitle").innerHTML="<b>Bronze Age</b>";
     $("eraDesc").innerText="Growth slows. Governance matters.";
+    $("advanceEra").className="iron";
     $("advanceEra").innerText="⚔️ Enter the Iron Age (75 🥉)";
-    $("advanceEra").style.display=eraObjectives().every(o=>o[1])?"block":"none";
   }
   else{
     $("eraTitle").innerHTML="<b>Iron Age</b>";
-    $("eraDesc").innerText="A new era of power, conflict and structure.";
+    $("eraDesc").innerText="Power breeds resistance. Balance is survival.";
     $("advanceEra").style.display="none";
   }
+
+  $("advanceEra").style.display=
+    state.era!=="iron"&&eraObjectives().every(o=>o[1])?"block":"none";
 
   $("objectives").innerHTML="";
   eraObjectives().forEach(o=>{
@@ -204,12 +221,21 @@ function update(){
     $("objectives").appendChild(d);
   });
 
+  const iron=state.era==="iron";
   $("btnMine").style.display=$("btnCouncil2").style.display=
     state.era==="bronze"?"block":"none";
 
+  $("btnBarracks").style.display=
+  $("btnForge").style.display=
+  $("btnArchive").style.display=
+    iron?"block":"none";
+
   $("info").innerText=
-    `Settlement ${COST.settlement} | Workshop ${COST.workshop} | Council ${COST.council}`+
+    "Settlement "+COST.settlement+
+    " | Workshop "+COST.workshop+
+    " | Council "+COST.council+
     (state.era!=="foundations"?" | Mine 25":"")+
+    (iron?" | Barracks 40 | Forge 50 | Archive 45":"")+
     (canAct()?" • Ready":"");
 
   $("city").innerHTML="";
@@ -250,6 +276,9 @@ $("btnSettle").onclick=()=>build("settlement","🏠");
 $("btnWork").onclick=()=>build("workshop","⚒️");
 $("btnCouncil").onclick=()=>build("council","🏛️");
 $("btnMine").onclick=()=>build("mine","⛏️");
+$("btnBarracks").onclick=()=>build("barracks","⚔️");
+$("btnForge").onclick=()=>build("forge","🏗️");
+$("btnArchive").onclick=()=>build("archive","📜");
 $("btnCouncil2").onclick=()=>{
   if(!canAct()||state.councilLv===2||state.bronze<30) return;
   state.bronze-=30;state.councilLv=2;
@@ -259,14 +288,11 @@ $("btnCouncil2").onclick=()=>{
 /* ===== ERA TRANSITION ===== */
 $("advanceEra").onclick=()=>{
   if(state.era==="foundations"&&state.prod>=ERA2_COST){
-    state.prod-=ERA2_COST;
-    state.era="bronze";
-    MAX_SLOTS=12;
+    state.prod-=ERA2_COST;state.era="bronze";MAX_SLOTS=12;
     log("The Bronze Age begins");
   }
   else if(state.era==="bronze"&&state.bronze>=ERA3_COST){
-    state.bronze-=ERA3_COST;
-    state.era="iron";
+    state.bronze-=ERA3_COST;state.era="iron";MAX_SLOTS=15;
     log("The Iron Age begins");
   }
   act();clamp();update();
@@ -278,30 +304,27 @@ setInterval(()=>{
     state.time++;
     const w=state.buildings.filter(b=>b==="⚒️").length;
     const m=state.buildings.filter(b=>b==="⛏️").length;
+    const f=state.buildings.filter(b=>b==="🏗️").length;
+    const bks=state.buildings.filter(b=>b==="⚔️").length;
+    const arc=state.buildings.filter(b=>b==="📜").length;
     const hasCouncil=state.buildings.includes("🏛️");
 
-    state.prod+=w*0.22;
+    state.prod+=(w*0.22)+(f*0.15);
     state.bronze+=m*0.05;
 
-    let pressure=Math.max(0,(w+m)-3);
-    if(state.pop>=20) pressure=0;
+    let pressure=Math.max(0,(w+m+f)-3);
+    if(state.era==="iron") pressure+=Math.floor(state.pop/20);
+
+    if(bks>0) pressure=Math.max(0,pressure-bks);
     if(state.pop>=30) state.stab+=0.04;
+    if(pressure>0) state.stab-=pressure*0.06;
 
-    if(pressure>0){
-      let loss=pressure*0.06;
-      if(hasCouncil) loss*=0.6;
-      state.stab-=loss;
-    }
-
+    if(arc>0) state.stab+=arc*0.02;
     if(state.stab<100) state.stab+=0.02;
 
-    if(state.era==="bronze"&&hasCouncil&&Date.now()-state.lastChange>=CALM_TIME*1000&&state.pop>=30){
-      state.stab+=state.councilLv===2?0.08:0.05;
-    }
-
-    if(state.era==="bronze"&&state.stab>=85){
-      state.objTime[0]++;
-    }
+    if(state.era==="bronze"&&state.stab>=85) state.objTime[0]++;
+    if(state.era==="iron"&&state.stab>=80) state.objTime[1]++;
+    if(state.era==="iron"&&state.stab>=90) state.objTime[2]++;
 
     clamp();update();
   }catch(e){
@@ -310,7 +333,7 @@ setInterval(()=>{
 },1000);
 
 function advisorText(){
-  if(state.era==="iron") return "Power reshapes the realm. Old rules no longer suffice.";
+  if(state.era==="iron") return "Power attracts resistance. Balance decides survival.";
   if(state.pop<20) return "A young society struggles to govern itself.";
   if(state.pop<30) return "Population absorbs pressure, but growth is fragile.";
   if(state.stab<85) return "Governance requires patience.";
