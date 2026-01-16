@@ -212,10 +212,15 @@ function update(){
     city.appendChild(t);
   }
 
-  advisor.textContent=
-    state.councilLv===2
-      ?"The state asserts its authority."
-      :"Governance is fragile.";
+  advisor.textContent =
+  state.era === "foundations"
+    ? "With limited industry, governance remains stable and easy to manage."
+    : state.councilLv === 0
+      ? "Industrial growth creates pressure. Without strong institutions, governance is fragile."
+      : state.councilLv === 1
+        ? "Councils strengthen governance. Population growth helps recover stability, but pressure remains."
+        : "Strong institutions counter industrial pressure. Governance steadily recovers as society grows.";
+
 
   events.innerHTML=state.events.map(e=>`<div>${e}</div>`).join("");
   save();
