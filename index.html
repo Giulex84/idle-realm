@@ -121,6 +121,15 @@ const DEFAULT={
 };
 
 let state=load();
+// DEV ONLY – remove before submission
+if(location.hash==="#iron"){
+  state.era="iron";
+  state.councilLv=2;
+  state.pop=40;
+  state.stab=75;
+  state.prod=60;
+  state.bronze=40;
+}
 
 /* ===== HELPERS ===== */
 const $=id=>document.getElementById(id);
