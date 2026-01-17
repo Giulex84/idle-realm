@@ -265,7 +265,7 @@ function build(type,icon){
 function remove(i){
   const b=state.buildings[i];
   if(!b) return;
-  if(state.era==="iron" && b==="⚒️" && state.buildings.filter(x=>x==="⚒️").length<=1) return;
+  if(b==="⚒️" && state.buildings.filter(x=>x==="⚒️").length<=1) return;
   state.buildings.splice(i,1);
   if(b==="🏠") state.pop=Math.max(0,state.pop-4);
   if(b==="🏛️") state.councilLv=0;
