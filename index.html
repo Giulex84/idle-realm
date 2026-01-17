@@ -209,7 +209,9 @@ function update(){
   sustainBox.style.display=state.era==="bronze"?"block":"none";
   sustainBar.style.width=Math.min(100,state.sustain/300*100)+"%";
 
-  advanceEra.style.display=eraObjectives().every(o=>o[1])?"block":"none";
+  advanceEra.style.display =
+  state.era!=="iron" && eraObjectives().every(o=>o[1]) ? "block" : "none";
+
   advanceEra.className=state.era==="bronze"?"iron":"bronze";
   advanceEra.textContent=
     state.era==="foundations"
@@ -310,11 +312,14 @@ advanceEra.onclick=()=>{
     state.era="bronze";
     log("The Bronze Age begins");
   }else if(state.era==="bronze"){
-    if(state.bronze<ERA3_COST) return;
-    state.bronze-=ERA3_COST;
-    state.era="iron";
-    log("The Iron Age begins");
-  }
+  if(state.bronze<ERA3_COST) return;
+  state.bronze=0;
+  state.prod=0;
+  state.sustain=0;
+  state.era="iron";
+  log("The Iron Age begins");
+}
+
   act();update();
 };
 
