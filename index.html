@@ -339,6 +339,7 @@ setInterval(()=>{
   if(state.councilLv===1) rec*=1.3;
   if(state.councilLv===2) rec*=1.8;
   if(state.councilLv===3) rec*=2.2;
+  if(state.era==="bronze" && state.councilLv===2 && state.pop>=40) rec*=2;
 
   if(state.councilLv>=2 && state.pop>=22){
     rec=Math.max(rec,loss+0.01);
