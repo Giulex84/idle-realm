@@ -1,25 +1,49 @@
 # Idle Realm
 
-Idle Realm is a mobile-first idle strategy game built for the Pi Browser.
+Idle Realm is a minimalist idle strategy game where a living world evolves over time based on player choices.
 
-Players guide the growth of a realm through historical eras, making irreversible
-decisions that shape production, stability, and long-term outcomes.
+The game focuses on governance, population growth, and long-term stability across multiple historical eras.
 
-## User Experience
-- Pi authentication on launch
-- Mandatory acceptance of Terms of Service and Privacy Policy before play
-- Fully playable without payments or advertisements
-- All progress stored locally on the user's device
+## Platform
 
-## Current Eras
-1. Foundations – onboarding and governance
-2. Age of Bronze – industrial specialization
-3. Iron Age (Preparation) – anticipation of external threats
+Idle Realm is a web application designed to run inside the **Pi Browser**.
 
-## Privacy
-Idle Realm does not collect personal data.
-No analytics, cookies, or third-party services are used.
+It is built as a single-page web app using:
+- One HTML file
+- Vanilla JavaScript
+- No frameworks
+- No external dependencies
+
+## Architecture
+
+- Single-file frontend (`index.html`)
+- No backend server
+- No database
+- All game state is stored locally using `localStorage`
+
+## Authentication & Consent
+
+If Pi authentication is present, it is fully handled by the Pi SDK.
+
+Idle Realm does not manage authentication logic, permissions, or user consent directly.
+
+## Deployment
+
+The project is hosted using:
+- **GitHub** for source control
+- **Cloudflare Pages** for static hosting
+
+Any update pushed to the main branch is automatically deployed.
+
+## Legal Pages
+
+The following static pages are included at the root of the repository:
+- `privacy.html` – Privacy Policy
+- `terms.html` – Terms of Service
+
+They are accessible from the game interface via simple links at the bottom of the page.
 
 ## Development Status
-Idle Realm is in active development.
-Future updates will expand eras and introduce external challenges after review approval.
+
+Idle Realm is under active development.  
+New eras, mechanics, and features may be added in future updates.
