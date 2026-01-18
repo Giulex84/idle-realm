@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<script>
+  Pi.init({ version: "2.0" });
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Idle Realm</title>
 
@@ -90,8 +95,12 @@ button:disabled{opacity:.4}
 
 <div class="card">
   <h2>Events</h2>
-  <div id="events"></div>
-  <div class="advisor" id="advisor"></div>
+  <button id="piLoginBtn" style="margin-bottom:8px;display:none">
+  🔐 Login with Pi
+</button>
+<div id="events"></div>
+<div class="advisor" id="advisor"></div>
+
 </div>
 </main>
 <div class="tiny" style="text-align:center;margin:20px 0">
@@ -125,6 +134,9 @@ const DEFAULT={
 };
 
 let state=load();
+  /* ===== PI AUTH STATE ===== */
+state.piUser = state.piUser || null;
+
 
 /* ===== HELPERS ===== */
 const $=id=>document.getElementById(id);
@@ -135,6 +147,31 @@ const clamp=()=>{
   state.bronze=Math.max(0,state.bronze);
   state.stab=Math.max(0,Math.min(100,state.stab));
 };
+  /* ===== PI AUTH ===== */
+const PI_SCOPES = ["username"];
+
+async function piLogin(){
+  try{
+    const auth = await Pi.authenticate(
+      PI_SCOPES,
+      function onIncompletePayment(payment){
+        console.log("Incomplete payment", payment);
+      }
+    );
+
+    if(auth && auth.user){
+      state.piUser = {
+        uid: auth.user.uid,
+        username: auth.user.username
+      };
+      log("Logged in as "+auth.user.username);
+      update();
+    }
+  }catch(err){
+    console.error("Pi auth error", err);
+    alert("Pi authentication failed");
+  }
+}
 
 /* ===== LOAD / SAVE ===== */
 function load(){
@@ -244,7 +281,16 @@ function update(){
 
   events.innerHTML=state.events.map(e=>`<div>${e}</div>`).join("");
   save();
+const btn = document.getElementById("piLoginBtn");
+if(btn){
+  if(state.piUser){
+    btn.style.display="none";
+  }else{
+    btn.style.display="block";
+    btn.onclick=piLogin;
+  }
 }
+
 
 /* ===== ACTIONS ===== */
 const act=()=>state.lastAction=Date.now();
