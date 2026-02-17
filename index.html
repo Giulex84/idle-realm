@@ -1,374 +1,160 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Idle Realm</title>
+import { useEffect, useState } from "react";
 
-<!-- Pi SDK -->
-<script src="https://sdk.minepi.com/pi-sdk.js"></script>
-<script>
-  if (window.Pi) {
-    Pi.init({ version: "2.0" });
-  }
-</script>
-
-<style>
-:root{
-  --card:#141c33;
-  --card2:#1b2546;
-  --accent:#2f6bff;
-  --bronze:#c27c2c;
-  --iron:#9aa0a6;
-  --text:#e6ecff;
-  --muted:#9aa4c7;
-  --ok:#22c55e;
-}
-*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
-body{margin:0;background:linear-gradient(180deg,#0a1020,#050a14);color:var(--text)}
-header{
-  position:sticky;top:0;z-index:10;
-  background:#060b18;
-  padding:8px 12px;
-  display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;
-  font-size:14px;
-}
-main{padding:16px;max-width:500px;margin:auto}
-.card{background:linear-gradient(180deg,var(--card),var(--card2));border-radius:16px;padding:16px;margin-bottom:16px}
-button{width:100%;border:none;border-radius:14px;padding:14px;margin-bottom:10px;background:var(--accent);color:white;font-size:16px}
-button.bronze{background:linear-gradient(180deg,#e0a24c,#b87328);color:#1a0f00;font-weight:600}
-button.iron{background:linear-gradient(180deg,#cfd4da,#7b8188);color:#0b0f14;font-weight:600}
-button:disabled{opacity:.4}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.tile{background:#0f1730;border-radius:12px;height:70px;display:flex;align-items:center;justify-content:center;font-size:26px}
-.small{font-size:13px;color:var(--muted)}
-.tiny{font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
-.obj{font-size:14px;margin-bottom:4px}
-.obj.ok{color:var(--ok)}
-.advisor{font-size:12px;color:#aab3ff;margin-top:10px;text-align:center}
-.bar{height:8px;background:#0b1228;border-radius:6px;overflow:hidden;margin-top:6px}
-.bar>div{height:100%;background:var(--ok);width:0%;transition:width .3s}
-</style>
-</head>
-
-<body>
-
-<header>
-  <span>👥 <b id="pop"></b></span>
-  <span>⚒️ <b id="prod"></b></span>
-  <span>🥉 <b id="bronze"></b></span>
-  <span>🛡️ <b id="stab"></b>%</span>
-  <span>⏳ <b id="time"></b></span>
-</header>
-
-<main>
-<h1>Idle Realm</h1>
-
-<button id="piLogin" style="margin-bottom:12px">🔐 Login with Pi</button>
-
-<div class="small">A living world shaped by time and choices</div>
-
-<div class="card">
-  <h2>Era</h2>
-  <div id="eraTitle"></div>
-  <div id="eraDesc" class="small"></div>
-  <div id="objectives"></div>
-
-  <div id="sustainBox" style="display:none">
-    <div class="small">Stability sustained</div>
-    <div class="bar"><div id="sustainBar"></div></div>
-  </div>
-
-  <button id="advanceEra" style="display:none"></button>
-  <div id="resetEra" class="tiny">↺ restart era</div>
-</div>
-
-<div class="card">
-  <h2>Build</h2>
-  <button id="btnSettle">🏠 Settlement</button>
-  <button id="btnWork">⚒️ Workshop</button>
-  <button id="btnCouncil">🏛️ Council</button>
-  <button id="btnCouncil2" style="display:none">🏛️ Council II (30 🥉)</button>
-  <button id="btnCouncil3" style="display:none">🏛️ Council III (60 🥉)</button>
-  <button id="btnMine" style="display:none">⛏️ Mine</button>
-  <div class="small" id="info"></div>
-</div>
-
-<div class="card">
-  <h2>City</h2>
-  <div class="grid" id="city"></div>
-</div>
-
-<div class="card">
-  <h2>Events</h2>
-  <div id="events"></div>
-  <div class="advisor" id="advisor"></div>
-</div>
-</main>
-
-<div class="tiny" style="text-align:center;margin:20px 0">
-  <a href="privacy.html" target="_blank">Privacy Policy</a> •
-  <a href="terms.html" target="_blank">Terms of Service</a>
-</div>
-
-<script>
-/* ===== PI AUTH STATE ===== */
-let piUser = null;
-
-/* ===== CONFIG ===== */
-const SLOT_BY_ERA={foundations:9,bronze:12,iron:15};
-const COOLDOWN=8;
-const ERA2_COST=50;
-const ERA3_COST=75;
-
-const COST={settlement:15,workshop:20,council:30,mine:25};
-
-const DEFAULT={
-  v:15,
-  era:"foundations",
-  pop:12,
-  prod:30,
-  bronze:0,
-  stab:100,
-  time:0,
-  lastAction:0,
-  lastSeen:Date.now(),
-  buildings:["⚒️"],
-  councilLv:0,
-  sustain:0,
-  events:["• Realm founded with basic craftsmanship"]
-};
-
-let state=load();
-
-/* ===== HELPERS ===== */
-const $=id=>document.getElementById(id);
-const maxSlots=()=>SLOT_BY_ERA[state.era];
-const clamp=()=>{
-  state.pop=Math.max(0,state.pop);
-  state.prod=Math.max(0,state.prod);
-  state.bronze=Math.max(0,state.bronze);
-  state.stab=Math.max(0,Math.min(100,state.stab));
-};
-
-/* ===== LOAD / SAVE ===== */
-function load(){
-  try{
-    const s=JSON.parse(localStorage.getItem("idleRealm"));
-    if(!s||s.v!==DEFAULT.v) throw 0;
-    return Object.assign(structuredClone(DEFAULT),s);
-  }catch{
-    localStorage.removeItem("idleRealm");
-    return structuredClone(DEFAULT);
+declare global {
+  interface Window {
+    Pi: any;
+    DeviceOrientationEvent: any;
   }
 }
-const save=()=>localStorage.setItem("idleRealm",JSON.stringify(state));
-const canAct=()=>Date.now()-state.lastAction>=COOLDOWN*1000;
-const log=m=>(state.events.unshift("• "+m),state.events=state.events.slice(0,10));
 
-/* ===== PI AUTH INIT ===== */
-try{
-  const savedUser=JSON.parse(localStorage.getItem("piUser"));
-  if(savedUser&&savedUser.uid) piUser=savedUser;
-}catch{}
+export default function Home() {
+  const [uid, setUid] = useState<string | null>(null);
+  const [heading, setHeading] = useState<number>(0);
+  const [premium, setPremium] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-const piLoginBtn=$("piLogin");
-if(piLoginBtn && window.Pi){
-  if(piUser) piLoginBtn.style.display="none";
-  piLoginBtn.onclick=async()=>{
-    try{
-      const auth=await Pi.authenticate(["username"],p=>console.log("Incomplete payment",p));
-      piUser={uid:auth.user.uid,username:auth.user.username};
-      localStorage.setItem("piUser",JSON.stringify(piUser));
-      piLoginBtn.style.display="none";
-      log("Authenticated as "+piUser.username);
-      update();
-    }catch(e){
-      console.error("Pi auth failed",e);
-      alert("Pi authentication failed");
+  useEffect(() => {
+    if (window.Pi) {
+      window.Pi.init({ version: "2.0" });
+    }
+  }, []);
+
+  // Compass logic
+  useEffect(() => {
+    const handleOrientation = (event: any) => {
+      if (event.alpha !== null) {
+        setHeading(Math.round(360 - event.alpha));
+      }
+    };
+
+    window.addEventListener("deviceorientation", handleOrientation);
+
+    return () => {
+      window.removeEventListener("deviceorientation", handleOrientation);
+    };
+  }, []);
+
+  const login = async () => {
+    try {
+      const scopes = ["username", "payments", "wallet_address"];
+      const auth = await window.Pi.authenticate(scopes, onIncompletePayment);
+
+      setUid(auth.user.uid);
+
+      await fetch("/api/pi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "engage", uid: auth.user.uid }),
+      });
+
+      alert("Welcome to Giulex Compass 🧭");
+    } catch (err) {
+      console.error(err);
     }
   };
+
+  const pay = async () => {
+    setLoading(true);
+
+    try {
+      await window.Pi.createPayment(
+        {
+          amount: 0.1,
+          memo: "Unlock Giulex Compass Premium",
+          metadata: { type: "premium_compass" },
+        },
+        {
+          onReadyForServerApproval: async (paymentId: string) => {
+            await fetch("/api/pi", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "approve", paymentId }),
+            });
+          },
+          onReadyForServerCompletion: async (
+            paymentId: string,
+            txid: string
+          ) => {
+            await fetch("/api/pi", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "complete",
+                paymentId,
+                txid,
+              }),
+            });
+
+            setPremium(true);
+            alert("Premium Compass Activated 🧭✨");
+          },
+        }
+      );
+    } catch (err) {
+      console.error(err);
+    }
+
+    setLoading(false);
+  };
+
+  const onIncompletePayment = (payment: any) => {
+    console.log("Incomplete payment", payment);
+  };
+
+  return (
+    <div style={{ textAlign: "center", marginTop: 50 }}>
+      <h1>Giulex Compass</h1>
+      <p>Mainnet Utility App</p>
+
+      {!uid ? (
+        <button onClick={login} style={{ padding: 10 }}>
+          Login with Pi
+        </button>
+      ) : (
+        <>
+          <div style={{ marginTop: 40 }}>
+            <div
+              style={{
+                width: 200,
+                height: 200,
+                margin: "auto",
+                borderRadius: "50%",
+                border: "5px solid black",
+                position: "relative",
+              }}
+            >
+              <div
+                style={{
+                  width: 2,
+                  height: 90,
+                  background: premium ? "red" : "gray",
+                  position: "absolute",
+                  top: 10,
+                  left: "50%",
+                  transform: `rotate(${heading}deg) translateX(-50%)`,
+                  transformOrigin: "bottom center",
+                }}
+              />
+            </div>
+
+            <h2>{heading}°</h2>
+
+            {!premium && (
+              <button
+                onClick={pay}
+                disabled={loading}
+                style={{ marginTop: 20 }}
+              >
+                {loading
+                  ? "Processing..."
+                  : "Unlock Premium Compass (0.1π)"}
+              </button>
+            )}
+
+            {premium && <p>Premium Supporter Badge 🏅</p>}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
-
-/* ===== OBJECTIVES ===== */
-function eraObjectives(){
-  if(state.era==="foundations"){
-    return [
-      ["Build 3 Settlements",state.buildings.filter(b=>b==="🏠").length>=3],
-      ["Reach 50 Production",state.prod>=50],
-      ["Establish the Council",state.councilLv>=1],
-      ["Stability ≥ 70%",state.stab>=70]
-    ];
-  }
-  if(state.era==="bronze"){
-    return [
-      ["Stability ≥ 75% (sustained)",state.sustain>=300],
-      ["Bronze ≥ 75",state.bronze>=75],
-      ["Council II established",state.councilLv===2]
-    ];
-  }
-  return [
-    ["Stability ≥ 80%",state.stab>=80],
-    ["High population reached",state.pop>=40],
-    ["Council III established",state.councilLv===3]
-  ];
-}
-
-/* ===== UPDATE ===== */
-function update(){
-  pop.textContent=state.pop;
-  prod.textContent=state.prod.toFixed(1);
-  bronze.textContent=state.bronze.toFixed(1);
-  stab.textContent=Math.round(state.stab);
-  time.textContent=state.time;
-
-  eraTitle.innerHTML=
-    state.era==="foundations"?"<b>Foundations</b>":
-    state.era==="bronze"?"<b>Bronze Age</b>":"<b>Iron Age</b>";
-
-  eraDesc.textContent=
-    state.era==="foundations"?"Fast growth to understand the game.":
-    state.era==="bronze"?"Governance stabilizes growing societies.":
-    "Complex societies require long-term balance.";
-
-  objectives.innerHTML="";
-  eraObjectives().forEach(o=>{
-    const d=document.createElement("div");
-    d.className="obj"+(o[1]?" ok":"");
-    d.textContent=(o[1]?"✔ ":"☐ ")+o[0];
-    objectives.appendChild(d);
-  });
-
-  sustainBox.style.display=state.era==="bronze"?"block":"none";
-  sustainBar.style.width=Math.min(100,state.sustain/300*100)+"%";
-
-  advanceEra.style.display=state.era!=="iron"&&eraObjectives().every(o=>o[1])?"block":"none";
-  advanceEra.className=state.era==="bronze"?"iron":"bronze";
-  advanceEra.textContent=
-    state.era==="foundations"
-      ?"🥉 Enter the Bronze Age (50 ⚒️)"
-      :"⚔️ Enter the Iron Age (75 🥉)";
-
-  btnMine.style.display=state.era!=="foundations"?"block":"none";
-  btnCouncil2.style.display=state.era==="bronze"?"block":"none";
-  btnCouncil3.style.display=state.era==="iron"?"block":"none";
-
-  info.textContent=
-    "🏠 15 ⚒️ | ⚒️ 20 ⚒️ | 🏛️ 30 ⚒️ | ⛏️ 25 ⚒️ | 🏛️ II 30 🥉 | 🏛️ III 60 🥉";
-
-  city.innerHTML="";
-  for(let i=0;i<maxSlots();i++){
-    const t=document.createElement("div");
-    t.className="tile";
-    t.textContent=state.buildings[i]||"⬜";
-    t.onclick=()=>remove(i);
-    city.appendChild(t);
-  }
-
-  advisor.textContent="Governance depends on population, industry, and institutions.";
-
-  events.innerHTML=state.events.map(e=>`<div>${e}</div>`).join("");
-  save();
-}
-
-/* ===== ACTIONS ===== */
-const act=()=>state.lastAction=Date.now();
-
-function build(type,icon){
-  if(!canAct()||state.prod<COST[type]||state.buildings.length>=maxSlots()) return;
-  if(type==="council"&&state.councilLv>0) return;
-  state.prod-=COST[type];
-  if(type==="council"){state.councilLv=1;state.buildings.push("🏛️");state.stab+=15;}
-  else state.buildings.push(icon);
-  if(type==="settlement"){state.pop+=4;state.stab-=6;}
-  clamp();log(icon+" constructed");act();update();
-}
-
-function remove(i){
-  const b=state.buildings[i];
-  if(!b) return;
-  if(b==="⚒️"&&state.buildings.filter(x=>x==="⚒️").length<=1) return;
-  state.buildings.splice(i,1);
-  if(b==="🏠") state.pop=Math.max(0,state.pop-4);
-  if(b==="🏛️") state.councilLv=0;
-  clamp();log(b+" removed");act();update();
-}
-
-/* ===== BUTTONS ===== */
-btnSettle.onclick=()=>build("settlement","🏠");
-btnWork.onclick=()=>build("workshop","⚒️");
-btnCouncil.onclick=()=>build("council","🏛️");
-btnMine.onclick=()=>build("mine","⛏️");
-
-btnCouncil2.onclick=()=>{
-  if(!canAct()||state.councilLv!==1||state.bronze<30) return;
-  state.bronze-=30;state.councilLv=2;log("Council II established");act();update();
-};
-
-btnCouncil3.onclick=()=>{
-  if(!canAct()||state.councilLv!==2||state.bronze<60) return;
-  state.bronze-=60;state.councilLv=3;log("Council III established");act();update();
-};
-
-advanceEra.onclick=()=>{
-  if(state.era==="foundations"){
-    if(state.prod<ERA2_COST) return;
-    state.prod-=ERA2_COST;state.era="bronze";log("The Bronze Age begins");
-  }else if(state.era==="bronze"){
-    if(state.bronze<ERA3_COST) return;
-    state.bronze=0;state.prod=0;state.sustain=0;state.era="iron";log("The Iron Age begins");
-  }
-  act();update();
-};
-
-/* ===== RESET ERA ===== */
-resetEra.onclick=()=>{
-  if(!confirm("Restart current era?")) return;
-  state=structuredClone(DEFAULT);
-  log("Era restarted");
-  update();
-};
-
-/* ===== TICK ===== */
-setInterval(()=>{
-  state.time++;
-  const w=state.buildings.filter(b=>b==="⚒️").length;
-  const m=state.buildings.filter(b=>b==="⛏️").length;
-
-  state.prod+=w*0.22;
-  state.bronze+=m*0.05;
-
-  let loss=m*0.05;
-  if(state.era!=="iron") loss+=w*0.04;
-  if(state.councilLv>=2) loss*=0.6;
-  if(state.councilLv===3) loss*=0.5;
-
-  let rec=0;
-  if(state.pop>=20) rec=0.02;
-  if(state.pop>=30) rec=0.05;
-  if(state.pop>=40) rec=0.08;
-  if(state.councilLv===1) rec*=1.3;
-  if(state.councilLv===2) rec*=(state.era==="iron"?1.1:1.8);
-  if(state.councilLv===3) rec*=2.2;
-
-  if(state.era==="iron"&&state.councilLv<3) rec*=0.6;
-  if(state.era==="bronze"&&state.councilLv===2&&state.pop>=40) rec*=2;
-
-  if(state.councilLv>=2&&state.pop>=22&&state.era!=="iron"){
-    rec=Math.max(rec,loss+0.01);
-  }
-
-  state.stab+=rec-loss;
-
-  if(state.era==="bronze"){
-    if(state.stab>=75) state.sustain++;
-    else state.sustain=0;
-  }
-
-  clamp();update();
-},1000);
-
-update();
-</script>
-</body>
-</html>
