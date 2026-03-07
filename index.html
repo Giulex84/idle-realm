@@ -309,7 +309,9 @@ btnCouncil3.onclick=()=>{
   if(!canAct()||state.councilLv!==2||state.bronze<60) return;
   state.bronze-=60;state.councilLv=3;log("Council III established");act();update();
 };
-
+<button onclick="testPayment()">
+Test Payment 0.01π
+</button>
 advanceEra.onclick=()=>{
   if(state.era==="foundations"){
     if(state.prod<ERA2_COST) return;
@@ -367,7 +369,65 @@ setInterval(()=>{
 
   clamp();update();
 },1000);
+async function testPayment(){
 
+Pi.createPayment(
+{
+amount:0.01,
+memo:"Idle Realm Test Payment"
+},
+{
+
+onReadyForServerApproval: async function(paymentId){
+
+await fetch("/api/pi",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+action:"approve",
+paymentId
+})
+});
+
+},
+
+onReadyForServerCompletion: async function(paymentId,txid){
+
+await fetch("/api/pi",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+action:"complete",
+paymentId,
+txid
+})
+});
+
+alert("Payment completed");
+
+},
+
+onCancel:function(paymentId){
+
+alert("Payment cancelled");
+
+},
+
+onError:function(error,payment){
+
+console.error(error);
+
+}
+
+}
+
+);
+
+}
 update();
 </script>
 </body>
