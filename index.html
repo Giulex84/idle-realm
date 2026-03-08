@@ -13,13 +13,28 @@ if(window.Pi){
 </script>
 
 <style>
-body{background:#0a1020;color:white;font-family:Arial;margin:0;padding:20px}
-button{padding:12px 20px;margin:10px 0;border-radius:10px;border:none;background:#2f6bff;color:white;font-size:16px;width:100%}
-.card{background:#141c33;padding:16px;border-radius:12px;margin-bottom:16px}
+body{margin:0;background:#0a1020;color:#e6ecff;font-family:Arial}
+header{padding:10px;background:#060b18;display:flex;gap:10px;justify-content:space-around}
+main{padding:20px;max-width:500px;margin:auto}
+.card{background:#141c33;border-radius:16px;padding:16px;margin-bottom:16px}
+button{width:100%;padding:14px;border:none;border-radius:12px;background:#2f6bff;color:white;font-size:16px;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{background:#0f1730;border-radius:12px;height:70px;display:flex;align-items:center;justify-content:center;font-size:26px}
 </style>
 
 </head>
+
 <body>
+
+<header>
+<span>👥 <b id="pop"></b></span>
+<span>⚒️ <b id="prod"></b></span>
+<span>🥉 <b id="bronze"></b></span>
+<span>🛡️ <b id="stab"></b>%</span>
+<span>⏳ <b id="time"></b></span>
+</header>
+
+<main>
 
 <h1>Idle Realm</h1>
 
@@ -29,25 +44,102 @@ button{padding:12px 20px;margin:10px 0;border-radius:10px;border:none;background
 💎 Support the Realm (0.1 Pi)
 </button>
 
-<div id="game" class="card">
-Game running...
+<div class="card">
+<h2>City</h2>
+<div class="grid" id="city"></div>
 </div>
+
+</main>
 
 <script>
 
 /* =============================
-PI USER STATE
+PI USER
 ============================= */
 
 let piUser=null
 
 try{
- const saved=JSON.parse(localStorage.getItem("piUser"))
- if(saved && saved.uid) piUser=saved
+ const savedUser=JSON.parse(localStorage.getItem("piUser"))
+ if(savedUser && savedUser.uid) piUser=savedUser
 }catch{}
 
 /* =============================
-LOGIN
+GAME STATE
+============================= */
+
+const DEFAULT={
+ pop:12,
+ prod:30,
+ bronze:0,
+ stab:100,
+ time:0,
+ buildings:["⚒️"]
+}
+
+let state=load()
+
+function load(){
+ try{
+   const s=JSON.parse(localStorage.getItem("idleRealm"))
+   if(!s) throw 0
+   return s
+ }catch{
+   return structuredClone(DEFAULT)
+ }
+}
+
+function save(){
+ localStorage.setItem("idleRealm",JSON.stringify(state))
+}
+
+/* =============================
+GAME UPDATE
+============================= */
+
+function update(){
+
+ pop.textContent=state.pop
+ prod.textContent=state.prod.toFixed(1)
+ bronze.textContent=state.bronze.toFixed(1)
+ stab.textContent=Math.round(state.stab)
+ time.textContent=state.time
+
+ city.innerHTML=""
+
+ for(let i=0;i<9;i++){
+
+   const tile=document.createElement("div")
+   tile.className="tile"
+
+   tile.textContent=state.buildings[i] || "⬜"
+
+   city.appendChild(tile)
+
+ }
+
+ save()
+
+}
+
+/* =============================
+GAME LOOP
+============================= */
+
+setInterval(()=>{
+
+ state.time++
+
+ const w=state.buildings.filter(b=>b==="⚒️").length
+
+ state.prod+=w*0.2
+
+ update()
+
+},1000)
+
+/* =============================
+PI LOGIN
 ============================= */
 
 const piLoginBtn=document.getElementById("piLogin")
@@ -56,6 +148,7 @@ if(piLoginBtn && window.Pi){
 
  if(piUser){
    piLoginBtn.style.display="none"
+   document.getElementById("piDonate").style.display="block"
  }
 
  piLoginBtn.onclick=async()=>{
@@ -63,8 +156,8 @@ if(piLoginBtn && window.Pi){
    try{
 
      const auth=await Pi.authenticate(
-       ["username","payments"],
-       payment=>console.log("Incomplete payment",payment)
+      ["username","payments"],
+      payment=>console.log("Incomplete payment",payment)
      )
 
      piUser={
@@ -78,8 +171,6 @@ if(piLoginBtn && window.Pi){
 
      const donateBtn=document.getElementById("piDonate")
      if(donateBtn) donateBtn.style.display="block"
-
-     console.log("Authenticated as",piUser.username)
 
      checkPendingPayments()
 
@@ -119,44 +210,31 @@ async function checkPendingPayments(){
        })
      })
 
-     console.log("Recovered payment",p.identifier)
-
    }
 
  }catch(e){
-   console.error("Pending recovery error",e)
+   console.error("pending recovery error",e)
  }
 
 }
 
 /* =============================
-PAYMENT BUTTON
+PI PAYMENT
 ============================= */
 
 const donateBtn=document.getElementById("piDonate")
 
-if(piUser && donateBtn){
- donateBtn.style.display="block"
-}
-
 if(donateBtn && window.Pi){
 
  donateBtn.onclick=()=>{
-
-   console.log("Payment clicked")
 
    if(!piUser){
      alert("Login with Pi first")
      return
    }
 
-   if(!window.Pi){
-     alert("Open the app in Pi Browser")
-     return
-   }
-
-   Pi.createPayment({
-
+   Pi.createPayment(
+   {
      amount:0.1,
      memo:"Support Idle Realm",
 
@@ -164,65 +242,52 @@ if(donateBtn && window.Pi){
        item:"realm_support",
        game:"idle_realm"
      }
-
    },
    {
 
      onReadyForServerApproval:async function(paymentId){
 
-       try{
-
-         await fetch("/api/pi",{
-           method:"POST",
-           headers:{
-            "Content-Type":"application/json"
-           },
-           body:JSON.stringify({
-             action:"approve",
-             paymentId:paymentId
-           })
+       await fetch("/api/pi",{
+         method:"POST",
+         headers:{
+          "Content-Type":"application/json"
+         },
+         body:JSON.stringify({
+           action:"approve",
+           paymentId:paymentId
          })
-
-       }catch(e){
-         console.error("Approval error",e)
-       }
+       })
 
      },
 
      onReadyForServerCompletion:async function(paymentId,txid){
 
-       try{
-
-         const res=await fetch("/api/pi",{
-           method:"POST",
-           headers:{
-            "Content-Type":"application/json"
-           },
-           body:JSON.stringify({
-             action:"complete",
-             paymentId:paymentId,
-             txid:txid
-           })
+       const res=await fetch("/api/pi",{
+         method:"POST",
+         headers:{
+          "Content-Type":"application/json"
+         },
+         body:JSON.stringify({
+           action:"complete",
+           paymentId:paymentId,
+           txid:txid
          })
+       })
 
-         const data=await res.json()
+       const data=await res.json()
 
-         if(data.result==="completed"){
-           alert("Thank you for supporting Idle Realm 💜")
-         }
-
-       }catch(e){
-         console.error("Completion error",e)
+       if(data.result==="completed"){
+         alert("Thank you for supporting Idle Realm 💜")
        }
 
      },
 
      onCancel:function(paymentId){
-       console.log("Payment cancelled",paymentId)
+       console.log("cancel",paymentId)
      },
 
      onError:function(error){
-       console.error("Payment error",error)
+       console.error("payment error",error)
      }
 
    })
@@ -230,6 +295,12 @@ if(donateBtn && window.Pi){
  }
 
 }
+
+/* =============================
+INIT
+============================= */
+
+update()
 
 </script>
 
