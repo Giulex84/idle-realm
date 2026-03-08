@@ -184,7 +184,7 @@ if(piLoginBtn && window.Pi){
       piUser={uid:auth.user.uid,username:auth.user.username};
       localStorage.setItem("piUser",JSON.stringify(piUser));
       piLoginBtn.style.display="none";
-      187 log("Authenticated as "+piUser.username);
+     log("Authenticated as "+piUser.username);
 update();
 
 if (window.Pi && Pi.getIncompleteServerPayments) {
