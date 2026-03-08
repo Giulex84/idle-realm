@@ -185,8 +185,11 @@ if(piLoginBtn && window.Pi){
       localStorage.setItem("piUser",JSON.stringify(piUser));
       piLoginBtn.style.display="none";
       187 log("Authenticated as "+piUser.username);
-188 update();
-189 checkPendingPayments();
+update();
+
+if (window.Pi && Pi.getIncompleteServerPayments) {
+  checkPendingPayments();
+}
     }catch(e){
       console.error("Pi auth failed",e);
       alert("Pi authentication failed");
@@ -197,7 +200,7 @@ if(piLoginBtn && window.Pi){
 
 async function checkPendingPayments(){
 
-  if(!window.Pi) return;
+  if (!window.Pi || !Pi.getIncompleteServerPayments) return;
 
   try{
 
