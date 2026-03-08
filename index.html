@@ -5,483 +5,233 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Idle Realm</title>
 
-<!-- Pi SDK -->
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 <script>
-  if (window.Pi) {
-    Pi.init({ version: "2.0" });
-  }
+if(window.Pi){
+ Pi.init({version:"2.0"});
+}
 </script>
 
 <style>
-:root{
-  --card:#141c33;
-  --card2:#1b2546;
-  --accent:#2f6bff;
-  --bronze:#c27c2c;
-  --iron:#9aa0a6;
-  --text:#e6ecff;
-  --muted:#9aa4c7;
-  --ok:#22c55e;
-}
-*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
-body{margin:0;background:linear-gradient(180deg,#0a1020,#050a14);color:var(--text)}
-header{
-  position:sticky;top:0;z-index:10;
-  background:#060b18;
-  padding:8px 12px;
-  display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;
-  font-size:14px;
-}
-main{padding:16px;max-width:500px;margin:auto}
-.card{background:linear-gradient(180deg,var(--card),var(--card2));border-radius:16px;padding:16px;margin-bottom:16px}
-button{width:100%;border:none;border-radius:14px;padding:14px;margin-bottom:10px;background:var(--accent);color:white;font-size:16px}
-button.bronze{background:linear-gradient(180deg,#e0a24c,#b87328);color:#1a0f00;font-weight:600}
-button.iron{background:linear-gradient(180deg,#cfd4da,#7b8188);color:#0b0f14;font-weight:600}
-button:disabled{opacity:.4}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.tile{background:#0f1730;border-radius:12px;height:70px;display:flex;align-items:center;justify-content:center;font-size:26px}
-.small{font-size:13px;color:var(--muted)}
-.tiny{font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
-.obj{font-size:14px;margin-bottom:4px}
-.obj.ok{color:var(--ok)}
-.advisor{font-size:12px;color:#aab3ff;margin-top:10px;text-align:center}
-.bar{height:8px;background:#0b1228;border-radius:6px;overflow:hidden;margin-top:6px}
-.bar>div{height:100%;background:var(--ok);width:0%;transition:width .3s}
+body{background:#0a1020;color:white;font-family:Arial;margin:0;padding:20px}
+button{padding:12px 20px;margin:10px 0;border-radius:10px;border:none;background:#2f6bff;color:white;font-size:16px;width:100%}
+.card{background:#141c33;padding:16px;border-radius:12px;margin-bottom:16px}
 </style>
-</head>
 
+</head>
 <body>
 
-<header>
-  <span>👥 <b id="pop"></b></span>
-  <span>⚒️ <b id="prod"></b></span>
-  <span>🥉 <b id="bronze"></b></span>
-  <span>🛡️ <b id="stab"></b>%</span>
-  <span>⏳ <b id="time"></b></span>
-</header>
-
-<main>
 <h1>Idle Realm</h1>
 
-<button id="piLogin" style="margin-bottom:12px">🔐 Login with Pi</button>
+<button id="piLogin">🔐 Login with Pi</button>
 
-<button id="piDonate" style="display:none;margin-bottom:12px">
+<button id="piDonate" style="display:none">
 💎 Support the Realm (0.1 Pi)
 </button>
 
-<div class="small">A living world shaped by time and choices</div>
-<div class="card">
-  <h2>Era</h2>
-  <div id="eraTitle"></div>
-  <div id="eraDesc" class="small"></div>
-  <div id="objectives"></div>
-
-  <div id="sustainBox" style="display:none">
-    <div class="small">Stability sustained</div>
-    <div class="bar"><div id="sustainBar"></div></div>
-  </div>
-
-  <button id="advanceEra" style="display:none"></button>
-  <div id="resetEra" class="tiny">↺ restart era</div>
-</div>
-
-<div class="card">
-  <h2>Build</h2>
-  <button id="btnSettle">🏠 Settlement</button>
-  <button id="btnWork">⚒️ Workshop</button>
-  <button id="btnCouncil">🏛️ Council</button>
-  <button id="btnCouncil2" style="display:none">🏛️ Council II (30 🥉)</button>
-  <button id="btnCouncil3" style="display:none">🏛️ Council III (60 🥉)</button>
-  <button id="btnMine" style="display:none">⛏️ Mine</button>
-  <div class="small" id="info"></div>
-</div>
-
-<div class="card">
-  <h2>City</h2>
-  <div class="grid" id="city"></div>
-</div>
-
-<div class="card">
-  <h2>Events</h2>
-  <div id="events"></div>
-  <div class="advisor" id="advisor"></div>
-</div>
-</main>
-
-<div class="tiny" style="text-align:center;margin:20px 0">
-  <a href="privacy.html" target="_blank">Privacy Policy</a> •
-  <a href="terms.html" target="_blank">Terms of Service</a>
+<div id="game" class="card">
+Game running...
 </div>
 
 <script>
-/* ===== PI AUTH STATE ===== */
-let piUser = null;
 
-/* ===== CONFIG ===== */
-const SLOT_BY_ERA={foundations:9,bronze:12,iron:15};
-const COOLDOWN=8;
-const ERA2_COST=50;
-const ERA3_COST=75;
+/* =============================
+PI USER STATE
+============================= */
 
-const COST={settlement:15,workshop:20,council:30,mine:25};
+let piUser=null
 
-const DEFAULT={
-  v:15,
-  era:"foundations",
-  pop:12,
-  prod:30,
-  bronze:0,
-  stab:100,
-  time:0,
-  lastAction:0,
-  lastSeen:Date.now(),
-  buildings:["⚒️"],
-  councilLv:0,
-  sustain:0,
-  events:["• Realm founded with basic craftsmanship"]
-};
-
-let state=load();
-
-/* ===== HELPERS ===== */
-const $=id=>document.getElementById(id);
-const maxSlots=()=>SLOT_BY_ERA[state.era];
-const clamp=()=>{
-  state.pop=Math.max(0,state.pop);
-  state.prod=Math.max(0,state.prod);
-  state.bronze=Math.max(0,state.bronze);
-  state.stab=Math.max(0,Math.min(100,state.stab));
-};
-
-/* ===== LOAD / SAVE ===== */
-function load(){
-  try{
-    const s=JSON.parse(localStorage.getItem("idleRealm"));
-    if(!s||s.v!==DEFAULT.v) throw 0;
-    return Object.assign(structuredClone(DEFAULT),s);
-  }catch{
-    localStorage.removeItem("idleRealm");
-    return structuredClone(DEFAULT);
-  }
-}
-const save=()=>localStorage.setItem("idleRealm",JSON.stringify(state));
-const canAct=()=>Date.now()-state.lastAction>=COOLDOWN*1000;
-const log=m=>(state.events.unshift("• "+m),state.events=state.events.slice(0,10));
-
-/* ===== PI AUTH INIT ===== */
 try{
-  const savedUser=JSON.parse(localStorage.getItem("piUser"));
-  if(savedUser&&savedUser.uid) piUser=savedUser;
+ const saved=JSON.parse(localStorage.getItem("piUser"))
+ if(saved && saved.uid) piUser=saved
 }catch{}
 
-const piLoginBtn=$("piLogin");
-if(piLoginBtn && window.Pi){
-  if(piUser) piLoginBtn.style.display="none";
-  piLoginBtn.onclick=async()=>{
-    try{
-      const auth=await Pi.authenticate(["username"],p=>console.log("Incomplete payment",p));
-      piUser={uid:auth.user.uid,username:auth.user.username};
-      localStorage.setItem("piUser",JSON.stringify(piUser));
-      piLoginBtn.style.display="none";
-     log("Authenticated as "+piUser.username);
-update();
+/* =============================
+LOGIN
+============================= */
 
-if (window.Pi && Pi.getIncompleteServerPayments) {
-  checkPendingPayments();
+const piLoginBtn=document.getElementById("piLogin")
+
+if(piLoginBtn && window.Pi){
+
+ if(piUser){
+   piLoginBtn.style.display="none"
+ }
+
+ piLoginBtn.onclick=async()=>{
+
+   try{
+
+     const auth=await Pi.authenticate(
+       ["username","payments"],
+       payment=>console.log("Incomplete payment",payment)
+     )
+
+     piUser={
+       uid:auth.user.uid,
+       username:auth.user.username
+     }
+
+     localStorage.setItem("piUser",JSON.stringify(piUser))
+
+     piLoginBtn.style.display="none"
+
+     const donateBtn=document.getElementById("piDonate")
+     if(donateBtn) donateBtn.style.display="block"
+
+     console.log("Authenticated as",piUser.username)
+
+     checkPendingPayments()
+
+   }catch(e){
+
+     console.error("Pi auth failed",e)
+
+   }
+
+ }
+
 }
-    }catch(e){
-      console.error("Pi auth failed",e);
-      alert("Pi authentication failed");
-    }
-  };
-}
-  /* ===== RECOVER PENDING PAYMENTS ===== */
+
+/* =============================
+RECOVER PENDING PAYMENTS
+============================= */
 
 async function checkPendingPayments(){
 
-  if (!window.Pi || !Pi.getIncompleteServerPayments) return;
+ if(!window.Pi || !Pi.getIncompleteServerPayments) return
 
-  try{
+ try{
 
-    const payments = await Pi.getIncompleteServerPayments();
+   const payments=await Pi.getIncompleteServerPayments()
 
-    for(const p of payments){
+   for(const p of payments){
 
-      await fetch("/api/pi",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          action:"complete",
-          paymentId:p.identifier,
-          txid:p.transaction.txid
-        })
-      });
+     await fetch("/api/pi",{
+       method:"POST",
+       headers:{
+        "Content-Type":"application/json"
+       },
+       body:JSON.stringify({
+         action:"complete",
+         paymentId:p.identifier,
+         txid:p.transaction.txid
+       })
+     })
 
-      console.log("Recovered pending payment",p.identifier);
+     console.log("Recovered payment",p.identifier)
 
-    }
+   }
 
-  }catch(e){
-    console.error("Pending payments recovery failed",e);
-  }
+ }catch(e){
+   console.error("Pending recovery error",e)
+ }
 
 }
-/* ===== PI PAYMENT BUTTON ===== */
 
-const donateBtn = document.getElementById("piDonate");
+/* =============================
+PAYMENT BUTTON
+============================= */
 
-if (piUser && donateBtn) {
-  donateBtn.style.display = "block";
+const donateBtn=document.getElementById("piDonate")
+
+if(piUser && donateBtn){
+ donateBtn.style.display="block"
 }
 
-if (donateBtn && window.Pi) {
-  donateBtn.onclick = () => {
+if(donateBtn && window.Pi){
 
-    if (!piUser) {
-      alert("Login with Pi first");
-      return;
-    }
+ donateBtn.onclick=()=>{
 
-    Pi.createPayment(
-      {
-        amount: 0.1,
-        memo: "Support Idle Realm",
-        metadata:{
-  item:"realm_support",
-  game:"idle_realm"
-        }
-      },
-      {
-        onReadyForServerApproval: async function(paymentId) {
-          try {
-            await fetch("/api/pi", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "approve",
-                paymentId: paymentId
-              })
-            });
-          } catch (e) {
-            console.error("Approval error", e);
-          }
-        },
+   console.log("Payment clicked")
 
-        onReadyForServerCompletion: async function(paymentId, txid) {
-          try {
-            const res = await fetch("/api/pi", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "complete",
-                paymentId: paymentId,
-                txid: txid
-              })
-            });
+   if(!piUser){
+     alert("Login with Pi first")
+     return
+   }
 
-            const data = await res.json();
+   if(!window.Pi){
+     alert("Open the app in Pi Browser")
+     return
+   }
 
-            if (data.result === "completed") {
-              alert("Thank you for supporting Idle Realm 💜");
-            }
+   Pi.createPayment({
 
-          } catch (e) {
-            console.error("Completion error", e);
-          }
-        },
+     amount:0.1,
+     memo:"Support Idle Realm",
 
-        onCancel: function(paymentId) {
-          console.log("Payment cancelled", paymentId);
-        },
+     metadata:{
+       item:"realm_support",
+       game:"idle_realm"
+     }
 
-        onError: function(error, payment) {
-          console.error("Payment error", error);
-        }
-      }
-    );
+   },
+   {
 
-  };
-}
-/* ===== OBJECTIVES ===== */
-function eraObjectives(){
-  if(state.era==="foundations"){
-    return [
-      ["Build 3 Settlements",state.buildings.filter(b=>b==="🏠").length>=3],
-      ["Reach 50 Production",state.prod>=50],
-      ["Establish the Council",state.councilLv>=1],
-      ["Stability ≥ 70%",state.stab>=70]
-    ];
-  }
-  if(state.era==="bronze"){
-    return [
-      ["Stability ≥ 75% (sustained)",state.sustain>=300],
-      ["Bronze ≥ 75",state.bronze>=75],
-      ["Council II established",state.councilLv===2]
-    ];
-  }
-  return [
-    ["Stability ≥ 80%",state.stab>=80],
-    ["High population reached",state.pop>=40],
-    ["Council III established",state.councilLv===3]
-  ];
-}
+     onReadyForServerApproval:async function(paymentId){
 
-/* ===== UPDATE ===== */
-function update(){
-  pop.textContent=state.pop;
-  prod.textContent=state.prod.toFixed(1);
-  bronze.textContent=state.bronze.toFixed(1);
-  stab.textContent=Math.round(state.stab);
-  time.textContent=state.time;
+       try{
 
-  eraTitle.innerHTML=
-    state.era==="foundations"?"<b>Foundations</b>":
-    state.era==="bronze"?"<b>Bronze Age</b>":"<b>Iron Age</b>";
+         await fetch("/api/pi",{
+           method:"POST",
+           headers:{
+            "Content-Type":"application/json"
+           },
+           body:JSON.stringify({
+             action:"approve",
+             paymentId:paymentId
+           })
+         })
 
-  eraDesc.textContent=
-    state.era==="foundations"?"Fast growth to understand the game.":
-    state.era==="bronze"?"Governance stabilizes growing societies.":
-    "Complex societies require long-term balance.";
+       }catch(e){
+         console.error("Approval error",e)
+       }
 
-  objectives.innerHTML="";
-  eraObjectives().forEach(o=>{
-    const d=document.createElement("div");
-    d.className="obj"+(o[1]?" ok":"");
-    d.textContent=(o[1]?"✔ ":"☐ ")+o[0];
-    objectives.appendChild(d);
-  });
+     },
 
-  sustainBox.style.display=state.era==="bronze"?"block":"none";
-  sustainBar.style.width=Math.min(100,state.sustain/300*100)+"%";
+     onReadyForServerCompletion:async function(paymentId,txid){
 
-  advanceEra.style.display=state.era!=="iron"&&eraObjectives().every(o=>o[1])?"block":"none";
-  advanceEra.className=state.era==="bronze"?"iron":"bronze";
-  advanceEra.textContent=
-    state.era==="foundations"
-      ?"🥉 Enter the Bronze Age (50 ⚒️)"
-      :"⚔️ Enter the Iron Age (75 🥉)";
+       try{
 
-  btnMine.style.display=state.era!=="foundations"?"block":"none";
-  btnCouncil2.style.display=state.era==="bronze"?"block":"none";
-  btnCouncil3.style.display=state.era==="iron"?"block":"none";
+         const res=await fetch("/api/pi",{
+           method:"POST",
+           headers:{
+            "Content-Type":"application/json"
+           },
+           body:JSON.stringify({
+             action:"complete",
+             paymentId:paymentId,
+             txid:txid
+           })
+         })
 
-  info.textContent=
-    "🏠 15 ⚒️ | ⚒️ 20 ⚒️ | 🏛️ 30 ⚒️ | ⛏️ 25 ⚒️ | 🏛️ II 30 🥉 | 🏛️ III 60 🥉";
+         const data=await res.json()
 
-  city.innerHTML="";
-  for(let i=0;i<maxSlots();i++){
-    const t=document.createElement("div");
-    t.className="tile";
-    t.textContent=state.buildings[i]||"⬜";
-    t.onclick=()=>remove(i);
-    city.appendChild(t);
-  }
+         if(data.result==="completed"){
+           alert("Thank you for supporting Idle Realm 💜")
+         }
 
-  advisor.textContent="Governance depends on population, industry, and institutions.";
+       }catch(e){
+         console.error("Completion error",e)
+       }
 
-  events.innerHTML=state.events.map(e=>`<div>${e}</div>`).join("");
-  save();
+     },
+
+     onCancel:function(paymentId){
+       console.log("Payment cancelled",paymentId)
+     },
+
+     onError:function(error){
+       console.error("Payment error",error)
+     }
+
+   })
+
+ }
+
 }
 
-/* ===== ACTIONS ===== */
-const act=()=>state.lastAction=Date.now();
-
-function build(type,icon){
-  if(!canAct()||state.prod<COST[type]||state.buildings.length>=maxSlots()) return;
-  if(type==="council"&&state.councilLv>0) return;
-  state.prod-=COST[type];
-  if(type==="council"){state.councilLv=1;state.buildings.push("🏛️");state.stab+=15;}
-  else state.buildings.push(icon);
-  if(type==="settlement"){state.pop+=4;state.stab-=6;}
-  clamp();log(icon+" constructed");act();update();
-}
-
-function remove(i){
-  const b=state.buildings[i];
-  if(!b) return;
-  if(b==="⚒️"&&state.buildings.filter(x=>x==="⚒️").length<=1) return;
-  state.buildings.splice(i,1);
-  if(b==="🏠") state.pop=Math.max(0,state.pop-4);
-  if(b==="🏛️") state.councilLv=0;
-  clamp();log(b+" removed");act();update();
-}
-
-/* ===== BUTTONS ===== */
-btnSettle.onclick=()=>build("settlement","🏠");
-btnWork.onclick=()=>build("workshop","⚒️");
-btnCouncil.onclick=()=>build("council","🏛️");
-btnMine.onclick=()=>build("mine","⛏️");
-
-btnCouncil2.onclick=()=>{
-  if(!canAct()||state.councilLv!==1||state.bronze<30) return;
-  state.bronze-=30;state.councilLv=2;log("Council II established");act();update();
-};
-
-btnCouncil3.onclick=()=>{
-  if(!canAct()||state.councilLv!==2||state.bronze<60) return;
-  state.bronze-=60;state.councilLv=3;log("Council III established");act();update();
-};
-
-advanceEra.onclick=()=>{
-  if(state.era==="foundations"){
-    if(state.prod<ERA2_COST) return;
-    state.prod-=ERA2_COST;state.era="bronze";log("The Bronze Age begins");
-  }else if(state.era==="bronze"){
-    if(state.bronze<ERA3_COST) return;
-    state.bronze=0;state.prod=0;state.sustain=0;state.era="iron";log("The Iron Age begins");
-  }
-  act();update();
-};
-
-/* ===== RESET ERA ===== */
-resetEra.onclick=()=>{
-  if(!confirm("Restart current era?")) return;
-  state=structuredClone(DEFAULT);
-  log("Era restarted");
-  update();
-};
-
-/* ===== TICK ===== */
-setInterval(()=>{
-  state.time++;
-  const w=state.buildings.filter(b=>b==="⚒️").length;
-  const m=state.buildings.filter(b=>b==="⛏️").length;
-
-  state.prod+=w*0.22;
-  state.bronze+=m*0.05;
-
-  let loss=m*0.05;
-  if(state.era!=="iron") loss+=w*0.04;
-  if(state.councilLv>=2) loss*=0.6;
-  if(state.councilLv===3) loss*=0.5;
-
-  let rec=0;
-  if(state.pop>=20) rec=0.02;
-  if(state.pop>=30) rec=0.05;
-  if(state.pop>=40) rec=0.08;
-  if(state.councilLv===1) rec*=1.3;
-  if(state.councilLv===2) rec*=(state.era==="iron"?1.1:1.8);
-  if(state.councilLv===3) rec*=2.2;
-
-  if(state.era==="iron"&&state.councilLv<3) rec*=0.6;
-  if(state.era==="bronze"&&state.councilLv===2&&state.pop>=40) rec*=2;
-
-  if(state.councilLv>=2&&state.pop>=22&&state.era!=="iron"){
-    rec=Math.max(rec,loss+0.01);
-  }
-
-  state.stab+=rec-loss;
-
-  if(state.era==="bronze"){
-    if(state.stab>=75) state.sustain++;
-    else state.sustain=0;
-  }
-
-  clamp();update();
-},1000);
-
-update();
 </script>
+
 </body>
 </html>
