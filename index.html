@@ -1,20 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Idle Realm</title>
 
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 
 <script>
 if(window.Pi){
-Pi.init({version:"2.0",sandbox:true});
+Pi.init({
+version:"2.0",
+sandbox:true
+});
 }
 </script>
 
 <style>
-/* ===== STILE ORIGINALE (NON MODIFICATO) ===== */
 :root{
 --card:#141c33;
 --card2:#1b2546;
@@ -26,7 +30,10 @@ Pi.init({version:"2.0",sandbox:true});
 --ok:#22c55e;
 }
 
-*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
+*{
+box-sizing:border-box;
+font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto;
+}
 
 body{
 margin:0;
@@ -71,7 +78,9 @@ color:white;
 font-size:16px;
 }
 
-button:disabled{opacity:.4}
+button:disabled{
+opacity:.4;
+}
 
 .grid{
 display:grid;
@@ -117,6 +126,7 @@ width:0%;
 transition:width .3s;
 }
 </style>
+
 </head>
 
 <body>
@@ -135,60 +145,104 @@ transition:width .3s;
 
 <button id="piLogin">🔐 Login with Pi</button>
 
-<button onclick="testPayment()">Test Payment 0.01π</button>
+<button id="payBtn">Test Payment 0.01π</button>
 
-<div class="small">A living world shaped by time and choices</div>
+<div class="small">
+A living world shaped by time and choices
+</div>
 
-<!-- resto della UI identico -->
 <div class="card">
 <h2>Era</h2>
+
 <div id="eraTitle"></div>
 <div id="eraDesc" class="small"></div>
 <div id="objectives"></div>
 
 <div id="sustainBox" style="display:none">
+
 <div class="small">Stability sustained</div>
-<div class="bar"><div id="sustainBar"></div></div>
+
+<div class="bar">
+<div id="sustainBar"></div>
+</div>
+
 </div>
 
 <button id="advanceEra" style="display:none"></button>
-<div id="resetEra" class="tiny">↺ restart era</div>
+
+<div id="resetEra" class="tiny">
+↺ restart era
+</div>
+
 </div>
 
 <div class="card">
+
 <h2>Build</h2>
+
 <button id="btnSettle">🏠 Settlement</button>
+
 <button id="btnWork">⚒️ Workshop</button>
+
 <button id="btnCouncil">🏛️ Council</button>
-<button id="btnCouncil2" style="display:none">🏛️ Council II (30 🥉)</button>
-<button id="btnCouncil3" style="display:none">🏛️ Council III (60 🥉)</button>
-<button id="btnMine" style="display:none">⛏️ Mine</button>
+
+<button id="btnCouncil2" style="display:none">
+🏛️ Council II (30 🥉)
+</button>
+
+<button id="btnCouncil3" style="display:none">
+🏛️ Council III (60 🥉)
+</button>
+
+<button id="btnMine" style="display:none">
+⛏️ Mine
+</button>
+
 <div class="small" id="info"></div>
+
 </div>
 
 <div class="card">
+
 <h2>City</h2>
+
 <div class="grid" id="city"></div>
+
 </div>
 
 <div class="card">
+
 <h2>Events</h2>
+
 <div id="events"></div>
+
 <div class="advisor" id="advisor"></div>
+
 </div>
 
 </main>
 
 <div class="tiny" style="text-align:center;margin:20px 0">
-<a href="privacy.html" target="_blank">Privacy Policy</a> •
-<a href="terms.html" target="_blank">Terms of Service</a>
+
+<a href="privacy.html" target="_blank">
+Privacy Policy
+</a>
+
+•
+
+<a href="terms.html" target="_blank">
+Terms of Service
+</a>
+
 </div>
 
 <script>
 
-/* ===== PI AUTH ===== */
+/* PI USER */
 
 let piUser=null;
+
+/* LOGIN PI */
 
 async function loginPi(){
 
@@ -201,7 +255,7 @@ onIncompletePaymentFound
 
 piUser=auth.user;
 
-console.log("Logged:",piUser.username);
+console.log("Logged as",piUser.username);
 
 }catch(e){
 
@@ -211,7 +265,7 @@ console.error(e);
 
 }
 
-/* ===== HANDLE PENDING PAYMENTS ===== */
+/* HANDLE PENDING PAYMENTS */
 
 async function onIncompletePaymentFound(payment){
 
@@ -236,17 +290,17 @@ paymentId:payment.identifier
 
 }
 
-/* ===== LOGIN BUTTON ===== */
+/* LOGIN BUTTON */
 
 document.getElementById("piLogin").onclick=loginPi;
 
-/* ===== TEST PAYMENT ===== */
+/* PAYMENT */
 
 async function testPayment(){
 
 if(!piUser){
 
-alert("Login with Pi first");
+alert("Login first");
 
 return;
 
@@ -256,7 +310,10 @@ Pi.createPayment(
 
 {
 amount:0.01,
-memo:"Idle Realm Test Payment"
+memo:"Idle Realm Test Payment",
+metadata:{
+type:"test_payment"
+}
 },
 
 {
@@ -268,17 +325,12 @@ await fetch("/api/pi",{
 method:"POST",
 
 headers:{
-
 "Content-Type":"application/json"
-
 },
 
 body:JSON.stringify({
-
 action:"approve",
-
 paymentId
-
 })
 
 });
@@ -292,19 +344,13 @@ await fetch("/api/pi",{
 method:"POST",
 
 headers:{
-
 "Content-Type":"application/json"
-
 },
 
 body:JSON.stringify({
-
 action:"complete",
-
 paymentId,
-
 txid
-
 })
 
 });
@@ -315,7 +361,7 @@ alert("Payment completed");
 
 onCancel:function(paymentId){
 
-console.log("cancelled",paymentId);
+console.log("Payment cancelled",paymentId);
 
 },
 
@@ -331,9 +377,15 @@ console.error(error);
 
 }
 
-/* ===== IL TUO GIOCO RESTA IDENTICO ===== */
+document.getElementById("payBtn").onclick=testPayment;
 
-/* (tutto il resto del tuo script originale rimane qui sotto senza modifiche) */
+/* ========================= */
+/* QUI CONTINUA IL TUO GIOCO */
+/* ========================= */
+
+/* IL RESTO DEL TUO SCRIPT ORIGINALE VA QUI
+   (state, load, update, tick ecc.)
+*/
 
 </script>
 
