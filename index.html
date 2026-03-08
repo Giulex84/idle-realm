@@ -227,21 +227,33 @@ if (piLoginBtn && window.Pi) {
   showDonateButton();
 
   piLoginBtn.onclick = async () => {
-    try {
-      const auth = await Pi.authenticate(
-        ["username", "payments"],
-        payment => console.log("Incomplete payment", payment)
-      ); /* payments scope is required for payment flow in SDK examples. */ /* cited */
-      piUser = { uid: auth.user.uid, username: auth.user.username };
-      localStorage.setItem("piUser", JSON.stringify(piUser));
-      piLoginBtn.style.display = "none";
-      showDonateButton();
-      log("Authenticated as " + piUser.username);
-      update();
-      await checkPendingPayments();
-    } catch (e) {
-      console.error("Pi auth failed", e);
-      alert("Pi authentication failed");
+  try {
+
+    const auth = await Pi.authenticate(
+      ["username","payments"],
+      payment => console.log("Incomplete payment", payment)
+    );
+
+    piUser = {
+      uid: auth.user.uid,
+      username: auth.user.username
+    };
+
+    localStorage.setItem("piUser", JSON.stringify(piUser));
+
+    piLoginBtn.style.display = "none";
+
+    showDonateButton();
+
+    log("Authenticated as " + piUser.username);
+
+    update();
+
+    await checkPendingPayments();
+
+  } catch (e) {
+    console.error("Pi auth failed", e);
+    alert("Pi authentication failed");
     }
   };
 } else {
