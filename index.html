@@ -254,7 +254,7 @@ if (piUser) {
 }
 
 /* ===== PI PAYMENT BUTTON ===== */
-if (donateBtn && window.Pi) {
+if (donateBtn) {
   donateBtn.onclick = () => {
     console.log("Payment clicked");
 
@@ -263,9 +263,9 @@ if (donateBtn && window.Pi) {
       return;
     }
 
-    if (typeof Pi.createPayment !== "function") {
-      alert("Open the app in Pi Browser");
-      return;
+    if (!window.Pi || typeof Pi.createPayment !== "function") {
+  alert("Pi SDK not ready. Reload the app in Pi Browser.");
+  return;
     }
 
     donateBtn.disabled = true;
