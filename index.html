@@ -8,9 +8,11 @@
 <!-- Pi SDK -->
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 <script>
+window.addEventListener("load", () => {
   if (window.Pi) {
     Pi.init({ version: "2.0" });
   }
+});
 </script>
 
 <style>
