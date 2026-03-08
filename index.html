@@ -189,7 +189,79 @@ if(piLoginBtn && window.Pi){
     }
   };
 }
+/* ===== PI PAYMENT BUTTON ===== */
 
+const donateBtn = document.getElementById("piDonate");
+
+if (piUser && donateBtn) {
+  donateBtn.style.display = "block";
+}
+
+if (donateBtn && window.Pi) {
+  donateBtn.onclick = () => {
+
+    if (!piUser) {
+      alert("Login with Pi first");
+      return;
+    }
+
+    Pi.createPayment(
+      {
+        amount: 0.1,
+        memo: "Support Idle Realm",
+        metadata: { type: "support" }
+      },
+      {
+        onReadyForServerApproval: async function(paymentId) {
+          try {
+            await fetch("/api/pi", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "approve",
+                paymentId: paymentId
+              })
+            });
+          } catch (e) {
+            console.error("Approval error", e);
+          }
+        },
+
+        onReadyForServerCompletion: async function(paymentId, txid) {
+          try {
+            const res = await fetch("/api/pi", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "complete",
+                paymentId: paymentId,
+                txid: txid
+              })
+            });
+
+            const data = await res.json();
+
+            if (data.result === "completed") {
+              alert("Thank you for supporting Idle Realm 💜");
+            }
+
+          } catch (e) {
+            console.error("Completion error", e);
+          }
+        },
+
+        onCancel: function(paymentId) {
+          console.log("Payment cancelled", paymentId);
+        },
+
+        onError: function(error, payment) {
+          console.error("Payment error", error);
+        }
+      }
+    );
+
+  };
+}
 /* ===== OBJECTIVES ===== */
 function eraObjectives(){
   if(state.era==="foundations"){
