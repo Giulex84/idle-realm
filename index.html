@@ -116,14 +116,12 @@ button:disabled{opacity:.4}
 <script>
 /* ===== PI AUTH STATE ===== */
 let piUser = null;
-let paymentBusy = false;
 
 /* ===== CONFIG ===== */
 const SLOT_BY_ERA = { foundations: 9, bronze: 12, iron: 15 };
 const COOLDOWN = 8;
 const ERA2_COST = 50;
 const ERA3_COST = 75;
-
 const COST = { settlement: 15, workshop: 20, council: 30, mine: 25 };
 
 const DEFAULT = {
@@ -160,31 +158,6 @@ const log = m => {
   state.events = state.events.slice(0, 10);
 };
 
-const piLoginBtn = $("piLogin");
-const donateBtn = $("piDonate");
-const popEl = $("pop");
-const prodEl = $("prod");
-const bronzeEl = $("bronze");
-const stabEl = $("stab");
-const timeEl = $("time");
-const eraTitleEl = $("eraTitle");
-const eraDescEl = $("eraDesc");
-const objectivesEl = $("objectives");
-const sustainBoxEl = $("sustainBox");
-const sustainBarEl = $("sustainBar");
-const advanceEraBtn = $("advanceEra");
-const resetEraBtn = $("resetEra");
-const btnSettleEl = $("btnSettle");
-const btnWorkEl = $("btnWork");
-const btnCouncilEl = $("btnCouncil");
-const btnCouncil2El = $("btnCouncil2");
-const btnCouncil3El = $("btnCouncil3");
-const btnMineEl = $("btnMine");
-const infoEl = $("info");
-const cityEl = $("city");
-const eventsEl = $("events");
-const advisorEl = $("advisor");
-
 /* ===== LOAD / SAVE ===== */
 function load() {
   try {
@@ -197,20 +170,10 @@ function load() {
   }
 }
 
-/* ===== PI AUTH INIT ===== */
-try {
-  const savedUser = JSON.parse(localStorage.getItem("piUser"));
-  if (savedUser && savedUser.uid) piUser = savedUser;
-} catch {}
-
-function syncPiUi() {
-  if (piUser) {
-    if (piLoginBtn) piLoginBtn.style.display = "none";
-    if (donateBtn) donateBtn.style.display = "block";
-  } else {
-    if (piLoginBtn) piLoginBtn.style.display = "block";
-    if (donateBtn) donateBtn.style.display = "none";
-  }
+/* ===== PI HELPERS ===== */
+function showDonateButton() {
+  const donateBtn = $("piDonate");
+  if (donateBtn) donateBtn.style.display = piUser ? "block" : "none";
 }
 
 async function checkPendingPayments() {
@@ -222,24 +185,27 @@ async function checkPendingPayments() {
     if (!Array.isArray(payments) || payments.length === 0) return;
 
     for (const p of payments) {
-      const paymentId = p && p.identifier;
-      const txid = p && p.transaction && p.transaction.txid;
-
-      if (!paymentId || !txid) continue;
+      if (!p || !p.identifier || !p.transaction || !p.transaction.txid) continue;
 
       try {
-        await fetch("/api/pi", {
+        const res = await fetch("/api/pi", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "complete",
-            paymentId,
-            txid
+            paymentId: p.identifier,
+            txid: p.transaction.txid
           })
         });
-        console.log("Recovered pending payment", paymentId);
-      } catch (err) {
-        console.error("Pending payment completion failed", paymentId, err);
+
+        if (!res.ok) {
+          console.error("Pending payment completion failed", p.identifier, res.status);
+          continue;
+        }
+
+        console.log("Recovered pending payment", p.identifier);
+      } catch (e) {
+        console.error("Pending payment completion error", e);
       }
     }
   } catch (e) {
@@ -247,35 +213,49 @@ async function checkPendingPayments() {
   }
 }
 
+/* ===== PI AUTH INIT ===== */
+try {
+  const savedUser = JSON.parse(localStorage.getItem("piUser"));
+  if (savedUser && savedUser.uid) piUser = savedUser;
+} catch {}
+
+const piLoginBtn = $("piLogin");
+const donateBtn = $("piDonate");
+
 if (piLoginBtn && window.Pi) {
+  if (piUser) piLoginBtn.style.display = "none";
+  showDonateButton();
+
   piLoginBtn.onclick = async () => {
     try {
       const auth = await Pi.authenticate(
         ["username", "payments"],
-        p => console.log("Incomplete payment", p)
-      );
-
-      piUser = {
-        uid: auth.user.uid,
-        username: auth.user.username
-      };
-
+        payment => console.log("Incomplete payment", payment)
+      ); /* payments scope is required for payment flow in SDK examples. */ /* cited */
+      piUser = { uid: auth.user.uid, username: auth.user.username };
       localStorage.setItem("piUser", JSON.stringify(piUser));
-      syncPiUi();
+      piLoginBtn.style.display = "none";
+      showDonateButton();
       log("Authenticated as " + piUser.username);
       update();
-
-      checkPendingPayments().catch(err => console.error(err));
+      await checkPendingPayments();
     } catch (e) {
       console.error("Pi auth failed", e);
       alert("Pi authentication failed");
     }
   };
+} else {
+  showDonateButton();
+}
+
+/* Recover any incomplete payments on load too, if user already logged in */
+if (piUser) {
+  checkPendingPayments();
 }
 
 /* ===== PI PAYMENT BUTTON ===== */
 if (donateBtn && window.Pi) {
-  donateBtn.onclick = async () => {
+  donateBtn.onclick = () => {
     console.log("Payment clicked");
 
     if (!piUser) {
@@ -283,96 +263,86 @@ if (donateBtn && window.Pi) {
       return;
     }
 
-    if (!window.Pi || typeof Pi.createPayment !== "function") {
-      alert("Pi Payments available only in Pi Browser");
+    if (typeof Pi.createPayment !== "function") {
+      alert("Open the app in Pi Browser");
       return;
     }
 
-    if (paymentBusy) return;
-    paymentBusy = true;
     donateBtn.disabled = true;
 
-    try {
-      Pi.createPayment(
-        {
-          amount: 0.1,
-          memo: "Support Idle Realm",
-          metadata: {
-            item: "realm_support",
-            game: "idle_realm"
+    Pi.createPayment(
+      {
+        amount: 0.1,
+        memo: "Support Idle Realm",
+        metadata: {
+          item: "realm_support",
+          game: "idle_realm"
+        }
+      },
+      {
+        onReadyForServerApproval: async function(paymentId) {
+          try {
+            const res = await fetch("/api/pi", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "approve",
+                paymentId: paymentId
+              })
+            });
+
+            if (!res.ok) {
+              throw new Error("Approval failed with status " + res.status);
+            }
+          } catch (e) {
+            console.error("Approval error", e);
+            donateBtn.disabled = false;
           }
         },
-        {
-          onReadyForServerApproval: async function(paymentId) {
-            try {
-              const res = await fetch("/api/pi", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  action: "approve",
-                  paymentId: paymentId
-                })
-              });
 
-              if (!res.ok) {
-                throw new Error("Approve failed with status " + res.status);
-              }
-            } catch (e) {
-              console.error("Approval error", e);
-              paymentBusy = false;
-              donateBtn.disabled = false;
+        onReadyForServerCompletion: async function(paymentId, txid) {
+          try {
+            const res = await fetch("/api/pi", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "complete",
+                paymentId: paymentId,
+                txid: txid
+              })
+            });
+
+            if (!res.ok) {
+              throw new Error("Completion failed with status " + res.status);
             }
-          },
 
-          onReadyForServerCompletion: async function(paymentId, txid) {
-            try {
-              const res = await fetch("/api/pi", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  action: "complete",
-                  paymentId: paymentId,
-                  txid: txid
-                })
-              });
+            const data = await res.json();
 
-              if (!res.ok) {
-                throw new Error("Complete failed with status " + res.status);
-              }
-
-              const data = await res.json();
-
-              if (data && (data.result === "completed" || data.ok === true)) {
-                alert("Thank you for supporting Idle Realm 💜");
-                log("Support payment completed");
-                update();
-              }
-            } catch (e) {
-              console.error("Completion error", e);
-            } finally {
-              paymentBusy = false;
-              donateBtn.disabled = false;
+            if (data && (data.result === "completed" || data.ok === true)) {
+              alert("Thank you for supporting Idle Realm 💜");
+              log("Realm supported via Pi payment");
+              update();
+            } else {
+              console.error("Unexpected completion response", data);
             }
-          },
-
-          onCancel: function(paymentId) {
-            console.log("Payment cancelled", paymentId);
-            paymentBusy = false;
-            donateBtn.disabled = false;
-          },
-
-          onError: function(error, payment) {
-            console.error("Payment error", error, payment);
-            paymentBusy = false;
+          } catch (e) {
+            console.error("Completion error", e);
+          } finally {
             donateBtn.disabled = false;
           }
+        },
+
+        onCancel: function(paymentId) {
+          console.log("Payment cancelled", paymentId);
+          donateBtn.disabled = false;
+        },
+
+        onError: function(error, payment) {
+          console.error("Payment error", error, payment);
+          donateBtn.disabled = false;
         }
-      );
-    } catch (e) {
-      console.error("createPayment failed", e);
-      paymentBusy = false;
-      donateBtn.disabled = false;
-    }
+      }
+    );
   };
 }
 
@@ -402,65 +372,67 @@ function eraObjectives() {
 
 /* ===== UPDATE ===== */
 function update() {
-  popEl.textContent = state.pop;
-  prodEl.textContent = state.prod.toFixed(1);
-  bronzeEl.textContent = state.bronze.toFixed(1);
-  stabEl.textContent = Math.round(state.stab);
-  timeEl.textContent = state.time;
+  pop.textContent = state.pop;
+  prod.textContent = state.prod.toFixed(1);
+  bronze.textContent = state.bronze.toFixed(1);
+  stab.textContent = Math.round(state.stab);
+  time.textContent = state.time;
 
-  eraTitleEl.innerHTML =
+  eraTitle.innerHTML =
     state.era === "foundations" ? "<b>Foundations</b>" :
-    state.era === "bronze" ? "<b>Bronze Age</b>" : "<b>Iron Age</b>";
+    state.era === "bronze" ? "<b>Bronze Age</b>" :
+    "<b>Iron Age</b>";
 
-  eraDescEl.textContent =
+  eraDesc.textContent =
     state.era === "foundations" ? "Fast growth to understand the game." :
     state.era === "bronze" ? "Governance stabilizes growing societies." :
     "Complex societies require long-term balance.";
 
-  objectivesEl.innerHTML = "";
+  objectives.innerHTML = "";
   eraObjectives().forEach(o => {
     const d = document.createElement("div");
     d.className = "obj" + (o[1] ? " ok" : "");
     d.textContent = (o[1] ? "✔ " : "☐ ") + o[0];
-    objectivesEl.appendChild(d);
+    objectives.appendChild(d);
   });
 
-  sustainBoxEl.style.display = state.era === "bronze" ? "block" : "none";
-  sustainBarEl.style.width = Math.min(100, state.sustain / 300 * 100) + "%";
+  sustainBox.style.display = state.era === "bronze" ? "block" : "none";
+  sustainBar.style.width = Math.min(100, state.sustain / 300 * 100) + "%";
 
-  advanceEraBtn.style.display =
+  advanceEra.style.display =
     state.era !== "iron" && eraObjectives().every(o => o[1]) ? "block" : "none";
-  advanceEraBtn.className = state.era === "bronze" ? "iron" : "bronze";
-  advanceEraBtn.textContent =
+  advanceEra.className = state.era === "bronze" ? "iron" : "bronze";
+  advanceEra.textContent =
     state.era === "foundations"
       ? "🥉 Enter the Bronze Age (50 ⚒️)"
       : "⚔️ Enter the Iron Age (75 🥉)";
 
-  btnMineEl.style.display = state.era !== "foundations" ? "block" : "none";
-  btnCouncil2El.style.display = state.era === "bronze" ? "block" : "none";
-  btnCouncil3El.style.display = state.era === "iron" ? "block" : "none";
+  btnMine.style.display = state.era !== "foundations" ? "block" : "none";
+  btnCouncil2.style.display = state.era === "bronze" ? "block" : "none";
+  btnCouncil3.style.display = state.era === "iron" ? "block" : "none";
 
-  infoEl.textContent =
+  info.textContent =
     "🏠 15 ⚒️ | ⚒️ 20 ⚒️ | 🏛️ 30 ⚒️ | ⛏️ 25 ⚒️ | 🏛️ II 30 🥉 | 🏛️ III 60 🥉";
 
-  cityEl.innerHTML = "";
+  city.innerHTML = "";
   for (let i = 0; i < maxSlots(); i++) {
     const t = document.createElement("div");
     t.className = "tile";
     t.textContent = state.buildings[i] || "⬜";
     t.onclick = () => remove(i);
-    cityEl.appendChild(t);
+    city.appendChild(t);
   }
 
-  advisorEl.textContent = "Governance depends on population, industry, and institutions.";
-  eventsEl.innerHTML = state.events.map(e => `<div>${e}</div>`).join("");
+  advisor.textContent = "Governance depends on population, industry, and institutions.";
 
-  syncPiUi();
+  events.innerHTML = state.events.map(e => `<div>${e}</div>`).join("");
   save();
 }
 
 /* ===== ACTIONS ===== */
-const act = () => state.lastAction = Date.now();
+const act = () => {
+  state.lastAction = Date.now();
+};
 
 function build(type, icon) {
   if (!canAct() || state.prod < COST[type] || state.buildings.length >= maxSlots()) return;
@@ -504,12 +476,12 @@ function remove(i) {
 }
 
 /* ===== BUTTONS ===== */
-btnSettleEl.onclick = () => build("settlement", "🏠");
-btnWorkEl.onclick = () => build("workshop", "⚒️");
-btnCouncilEl.onclick = () => build("council", "🏛️");
-btnMineEl.onclick = () => build("mine", "⛏️");
+btnSettle.onclick = () => build("settlement", "🏠");
+btnWork.onclick = () => build("workshop", "⚒️");
+btnCouncil.onclick = () => build("council", "🏛️");
+btnMine.onclick = () => build("mine", "⛏️");
 
-btnCouncil2El.onclick = () => {
+btnCouncil2.onclick = () => {
   if (!canAct() || state.councilLv !== 1 || state.bronze < 30) return;
   state.bronze -= 30;
   state.councilLv = 2;
@@ -518,7 +490,7 @@ btnCouncil2El.onclick = () => {
   update();
 };
 
-btnCouncil3El.onclick = () => {
+btnCouncil3.onclick = () => {
   if (!canAct() || state.councilLv !== 2 || state.bronze < 60) return;
   state.bronze -= 60;
   state.councilLv = 3;
@@ -527,7 +499,7 @@ btnCouncil3El.onclick = () => {
   update();
 };
 
-advanceEraBtn.onclick = () => {
+advanceEra.onclick = () => {
   if (state.era === "foundations") {
     if (state.prod < ERA2_COST) return;
     state.prod -= ERA2_COST;
@@ -546,7 +518,7 @@ advanceEraBtn.onclick = () => {
 };
 
 /* ===== RESET ERA ===== */
-resetEraBtn.onclick = () => {
+resetEra.onclick = () => {
   if (!confirm("Restart current era?")) return;
   state = structuredClone(DEFAULT);
   log("Era restarted");
@@ -594,13 +566,8 @@ setInterval(() => {
   update();
 }, 1000);
 
-/* ===== INIT ===== */
-syncPiUi();
 update();
-
-if (piUser) {
-  checkPendingPayments().catch(err => console.error(err));
-}
+showDonateButton();
 </script>
 </body>
 </html>
