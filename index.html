@@ -66,8 +66,11 @@ button:disabled{opacity:.4}
 
 <button id="piLogin" style="margin-bottom:12px">🔐 Login with Pi</button>
 
-<div class="small">A living world shaped by time and choices</div>
+<button id="piDonate" style="display:none;margin-bottom:12px">
+💎 Support the Realm (0.1 Pi)
+</button>
 
+<div class="small">A living world shaped by time and choices</div>
 <div class="card">
   <h2>Era</h2>
   <div id="eraTitle"></div>
@@ -181,13 +184,45 @@ if(piLoginBtn && window.Pi){
       piUser={uid:auth.user.uid,username:auth.user.username};
       localStorage.setItem("piUser",JSON.stringify(piUser));
       piLoginBtn.style.display="none";
-      log("Authenticated as "+piUser.username);
-      update();
+      187 log("Authenticated as "+piUser.username);
+188 update();
+189 checkPendingPayments();
     }catch(e){
       console.error("Pi auth failed",e);
       alert("Pi authentication failed");
     }
   };
+}
+  /* ===== RECOVER PENDING PAYMENTS ===== */
+
+async function checkPendingPayments(){
+
+  if(!window.Pi) return;
+
+  try{
+
+    const payments = await Pi.getIncompleteServerPayments();
+
+    for(const p of payments){
+
+      await fetch("/api/pi",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          action:"complete",
+          paymentId:p.identifier,
+          txid:p.transaction.txid
+        })
+      });
+
+      console.log("Recovered pending payment",p.identifier);
+
+    }
+
+  }catch(e){
+    console.error("Pending payments recovery failed",e);
+  }
+
 }
 /* ===== PI PAYMENT BUTTON ===== */
 
@@ -209,7 +244,10 @@ if (donateBtn && window.Pi) {
       {
         amount: 0.1,
         memo: "Support Idle Realm",
-        metadata: { type: "support" }
+        metadata:{
+  item:"realm_support",
+  game:"idle_realm"
+        }
       },
       {
         onReadyForServerApproval: async function(paymentId) {
