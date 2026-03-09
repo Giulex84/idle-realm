@@ -6,7 +6,7 @@
 <title>Idle Realm</title>
 
 <!-- Pi SDK -->
-<script src="https://sdk.minepi.com/pi-sdk.js?v=2"></script>
+<script src="https://sdk.minepi.com/pi-sdk.js?v=3"></script>
 <script>
 window.addEventListener("load", () => {
   if (window.Pi) {
@@ -235,6 +235,7 @@ if (piLoginBtn && window.Pi) {
       ["username","payments"],
       payment => console.log("Incomplete payment", payment)
     );
+    Pi.openShareDialog("Idle Realm ready for payments!");
 
     piUser = {
       uid: auth.user.uid,
