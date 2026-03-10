@@ -6,13 +6,10 @@
 <title>Idle Realm</title>
 
 <!-- Pi SDK -->
-<script src="https://sdk.minepi.com/pi-sdk.js?v=3"></script>
+<<script src="https://sdk.minepi.com/pi-sdk.js"></script>
 <script>
-window.addEventListener("load", () => {
-  if (window.Pi) {
-    Pi.init({ version: "2.0" });
-  }
-});
+const Pi = window.Pi;
+Pi.init({ version: "2.0" });
 </script>
 
 <style>
@@ -228,37 +225,82 @@ if (piLoginBtn && window.Pi) {
   if (piUser) piLoginBtn.style.display = "none";
   showDonateButton();
 
-  piLoginBtn.onclick = async () => {
+  donateBtn.onclick = async () => {
+
+  if (!piUser) {
+    alert("Login with Pi first");
+    return;
+  }
+
+  donateBtn.disabled = true;
+
   try {
 
-    const auth = await Pi.authenticate(
-      ["username","payments"],
-      payment => console.log("Incomplete payment", payment)
+    await Pi.createPayment(
+      {
+        amount: 0.1,
+        memo: "Support Idle Realm",
+        metadata: {
+          item: "realm_support",
+          game: "idle_realm"
+        }
+      },
+      {
+
+        onReadyForServerApproval: async (paymentId) => {
+
+          const res = await fetch("/api/pi", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({
+              action: "approve",
+              paymentId: paymentId
+            })
+          });
+
+          if (!res.ok) throw new Error("Approval failed");
+
+        },
+
+        onReadyForServerCompletion: async (paymentId, txid) => {
+
+          const res = await fetch("/api/pi", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({
+              action: "complete",
+              paymentId: paymentId,
+              txid: txid
+            })
+          });
+
+          if (!res.ok) throw new Error("Completion failed");
+
+          alert("Thank you for supporting Idle Realm 💜");
+
+          donateBtn.disabled = false;
+
+        },
+
+        onCancel: () => {
+          donateBtn.disabled = false;
+        },
+
+        onError: () => {
+          donateBtn.disabled = false;
+        }
+
+      }
     );
-    Pi.openShareDialog("Idle Realm ready for payments!");
 
-    piUser = {
-      uid: auth.user.uid,
-      username: auth.user.username
-    };
+  } catch (err) {
 
-    localStorage.setItem("piUser", JSON.stringify(piUser));
+    console.error("Payment failed", err);
+    donateBtn.disabled = false;
 
-    piLoginBtn.style.display = "none";
+  }
 
-    showDonateButton();
-
-    log("Authenticated as " + piUser.username);
-
-    update();
-
-    await checkPendingPayments();
-
-  } catch (e) {
-    console.error("Pi auth failed", e);
-    alert("Pi authentication failed");
-    }
-  };
+};
 } else {
   showDonateButton();
 }
