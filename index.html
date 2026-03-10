@@ -311,6 +311,33 @@ if (piUser) {
 }
 
 /* ===== PI PAYMENT BUTTON ===== */
+if (donateBtn && window.Pi) {
+  donateBtn.onclick = () => {
+    console.log("Payment clicked");
+
+    if (!piUser) {
+      alert("Login with Pi first");
+      return;
+    }
+
+    if (!window.Pi) {
+  alert("Open this app in Pi Browser");
+  return;
+}
+
+    donateBtn.disabled = true;
+
+    Pi.createPayment(
+      {
+        amount: 0.1,
+        memo: "Support Idle Realm",
+        metadata: {
+          item: "realm_support",
+          game: "idle_realm"
+        }
+      },
+      {
+        onReadyForServerApproval: async function(paymentId) {
           try {
             const res = await fetch("/api/pi", {
               method: "POST",
