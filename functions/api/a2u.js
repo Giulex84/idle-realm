@@ -37,6 +37,7 @@ async function fetchWithTimeout(url, options = {}, timeout = 8000) {
     throw err;
 
   }
+
 }
 
 export const onRequestPost = async ({ request, env }) => {
@@ -56,7 +57,9 @@ export const onRequestPost = async ({ request, env }) => {
       "Content-Type": "application/json"
     };
 
-    /* CHECK ONGOING PAYMENTS */
+    /* -------------------------------- */
+    /* CLEANUP ONGOING PAYMENTS         */
+    /* -------------------------------- */
 
     const incomplete = await fetchWithTimeout(
       `${PI_API}/incomplete_server_payments`,
@@ -109,7 +112,9 @@ export const onRequestPost = async ({ request, env }) => {
 
     }
 
-    /* CREATE PAYMENT */
+    /* -------------------------------- */
+    /* CREATE PAYMENT (A2U)              */
+    /* -------------------------------- */
 
     const create = await fetchWithTimeout(PI_API, {
       method: "POST",
@@ -127,16 +132,21 @@ export const onRequestPost = async ({ request, env }) => {
     const createData = await safeJson(create);
 
     if (!create.ok) {
+
       console.error("CREATE ERROR", createData);
+
       return json(createData, 500);
+
     }
 
     const paymentId = createData.identifier;
 
-    /* SUBMIT */
+    /* -------------------------------- */
+    /* SUBMIT TRANSACTION                */
+    /* -------------------------------- */
 
     const submit = await fetchWithTimeout(
-      `${PI_API}/${paymentId}/submit`,
+      `${PI_API}/${paymentId}/submit_transaction`,
       {
         method: "POST",
         headers
@@ -146,8 +156,11 @@ export const onRequestPost = async ({ request, env }) => {
     const submitData = await safeJson(submit);
 
     if (!submit.ok) {
+
       console.error("SUBMIT ERROR", submitData);
+
       return json(submitData, 500);
+
     }
 
     const txid = submitData.transaction?.txid;
@@ -156,7 +169,9 @@ export const onRequestPost = async ({ request, env }) => {
       return json({ error: "missing txid" }, 500);
     }
 
-    /* COMPLETE */
+    /* -------------------------------- */
+    /* COMPLETE PAYMENT                  */
+    /* -------------------------------- */
 
     const complete = await fetchWithTimeout(
       `${PI_API}/${paymentId}/complete`,
@@ -170,8 +185,11 @@ export const onRequestPost = async ({ request, env }) => {
     const completeData = await safeJson(complete);
 
     if (!complete.ok) {
+
       console.error("COMPLETE ERROR", completeData);
+
       return json(completeData, 500);
+
     }
 
     return json({
