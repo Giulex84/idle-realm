@@ -1,67 +1,112 @@
 export const onRequestPost = async ({ request, env }) => {
 
-const PI_API = "https://api.minepi.com/v2/payments"
+const PI_API = "https://api.minepi.com/v2/payments";
 
 try {
 
-const { uid, amount } = await request.json()
+const body = await request.json();
+
+const { uid, amount, memo } = body;
+
+if (!uid || !amount) {
+
+return new Response(
+JSON.stringify({ error:"missing parameters" }),
+{ status:400 }
+);
+
+}
 
 const headers = {
 Authorization:`Key ${env.PI_API_KEY}`,
 "Content-Type":"application/json"
-}
+};
 
-/* CREATE PAYMENT */
+/* CREATE PAYMENT (A2U) */
 
 const create = await fetch(PI_API,{
 method:"POST",
 headers,
 body:JSON.stringify({
 payment:{
-uid,
-amount,
-memo:"Idle Realm reward",
-metadata:{source:"idle_realm"}
+uid:uid,
+amount:amount,
+memo:memo || "Idle Realm reward",
+metadata:{source:"idle_realm_a2u"}
 }
 })
-})
+});
 
-const payment = await create.json()
+const createData = await create.json();
 
-const paymentId = payment.identifier
+if(!create.ok){
 
-/* SUBMIT */
+return new Response(
+JSON.stringify(createData),
+{ status:500 }
+);
+
+}
+
+const paymentId = createData.identifier;
+
+/* SUBMIT PAYMENT */
 
 const submit = await fetch(`${PI_API}/${paymentId}/submit`,{
 method:"POST",
 headers
-})
+});
 
-const submitData = await submit.json()
+const submitData = await submit.json();
 
-const txid = submitData.transaction.txid
+if(!submit.ok){
 
-/* COMPLETE */
+return new Response(
+JSON.stringify(submitData),
+{ status:500 }
+);
 
-await fetch(`${PI_API}/${paymentId}/complete`,{
+}
+
+const txid = submitData.transaction.txid;
+
+/* COMPLETE PAYMENT */
+
+const complete = await fetch(`${PI_API}/${paymentId}/complete`,{
 method:"POST",
 headers,
-body:JSON.stringify({txid})
-})
+body:JSON.stringify({ txid })
+});
 
-return new Response(JSON.stringify({
+const completeData = await complete.json();
+
+if(!complete.ok){
+
+return new Response(
+JSON.stringify(completeData),
+{ status:500 }
+);
+
+}
+
+return new Response(
+JSON.stringify({
 success:true,
+paymentId,
 txid
-}))
+}),
+{ status:200 }
+);
 
-}catch(e){
+}catch(err){
 
-console.error(e)
+console.error(err);
 
-return new Response(JSON.stringify({
-error:"A2U failed"
-}),{status:500})
+return new Response(
+JSON.stringify({ error:"server error" }),
+{ status:500 }
+);
 
 }
 
-}
+};
