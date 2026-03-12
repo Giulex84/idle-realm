@@ -140,7 +140,7 @@ export const onRequestPost = async ({ request, env }) => {
     /* SUBMIT TRANSACTION */
 
     const submit = await fetchWithTimeout(
-      `${PI_API}/${paymentId}/submit`,
+      `${PI_API}/${paymentId}/submit_transaction`,
       {
         method: "POST",
         headers
