@@ -1,233 +1,127 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Idle Realm</title>
+<title>Idle Realm A2U Test</title>
 
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+
 <script>
-const Pi = window.Pi;
-Pi.init({ version: "2.0" });
+const Pi = window.Pi
+Pi.init({ version:"2.0" })
 </script>
 
 <style>
-:root{
---card:#141c33;
---card2:#1b2546;
---accent:#2f6bff;
---bronze:#c27c2c;
---iron:#9aa0a6;
---text:#e6ecff;
---muted:#9aa4c7;
---ok:#22c55e;
+
+body{
+font-family:Arial;
+background:#111;
+color:white;
+text-align:center;
+padding:40px;
 }
-*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto}
-body{margin:0;background:linear-gradient(180deg,#0a1020,#050a14);color:var(--text)}
-header{position:sticky;top:0;background:#060b18;padding:8px;display:flex;gap:8px;justify-content:space-between}
-main{padding:16px;max-width:500px;margin:auto}
-.card{background:linear-gradient(180deg,var(--card),var(--card2));border-radius:16px;padding:16px;margin-bottom:16px}
-button{width:100%;border:none;border-radius:14px;padding:14px;margin-bottom:10px;background:var(--accent);color:white;font-size:16px}
-button:disabled{opacity:.4}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.tile{background:#0f1730;border-radius:12px;height:70px;display:flex;align-items:center;justify-content:center;font-size:26px}
-.small{font-size:13px;color:var(--muted)}
+
+button{
+padding:12px 20px;
+font-size:16px;
+margin:10px;
+border-radius:8px;
+border:none;
+cursor:pointer;
+}
+
 </style>
+
 </head>
 
 <body>
 
-<header>
-<span>👥 <b id="pop"></b></span>
-<span>⚒️ <b id="prod"></b></span>
-<span>🥉 <b id="bronze"></b></span>
-<span>🛡️ <b id="stab"></b>%</span>
-<span>⏳ <b id="time"></b></span>
-</header>
+<h1>Idle Realm A2U Test</h1>
 
-<main>
+<div id="user">Not logged</div>
 
-<h1>Idle Realm</h1>
+<button id="login">Login</button>
 
-<button id="piLogin">🔐 Login with Pi</button>
-<button id="piDonate" style="display:none">💎 Support the Realm (0.1 Pi)</button>
+<button id="send" disabled>
+Send 0.01π Reward
+</button>
 
-<div class="card">
-<h2>City</h2>
-<div class="grid" id="city"></div>
-</div>
-
-</main>
+<div id="status"></div>
 
 <script>
 
-/* =========================
-PI AUTH
-========================= */
+let currentUser=null
 
-let piUser=null
-const scopes=["username","payments"]
+function setStatus(msg){
+document.getElementById("status").innerText=msg
+}
 
-const loginBtn=document.getElementById("piLogin")
-const donateBtn=document.getElementById("piDonate")
-
-loginBtn.onclick=async()=>{
+document.getElementById("login").onclick=async()=>{
 
 try{
 
 const auth=await Pi.authenticate(
-scopes,
-payment=>console.log("Incomplete payment",payment)
+["username","payments","wallet_address"],
+payment=>console.log(payment)
 )
 
-piUser={
-uid:auth.user.uid,
-username:auth.user.username
-}
+currentUser=auth.user
 
-localStorage.setItem("piUser",JSON.stringify(piUser))
+document.getElementById("user").innerText=
+"Logged as "+currentUser.username
 
-loginBtn.style.display="none"
-donateBtn.style.display="block"
+document.getElementById("send").disabled=false
 
-console.log("Logged in:",piUser.username)
+}catch(e){
 
-}catch(err){
-
-console.error(err)
+console.error(e)
 
 }
 
 }
 
-/* =========================
-PI PAYMENT
-========================= */
+document.getElementById("send").onclick=async()=>{
 
-donateBtn.onclick=async()=>{
+if(!currentUser)return
 
-if(!piUser){
-alert("Login first")
-return
-}
+setStatus("Sending reward...")
 
-donateBtn.disabled=true
+try{
 
-const paymentData={
-amount:0.1,
-memo:"Support Idle Realm",
-metadata:{game:"idle_realm"}
-}
-
-const callbacks={
-
-onReadyForServerApproval:async(paymentId)=>{
-
-await fetch("/api/pi",{
+const r=await fetch("/api/a2u",{
 method:"POST",
-headers:{"Content-Type":"application/json"},
+headers:{
+"Content-Type":"application/json"
+},
 body:JSON.stringify({
-action:"approve",
-paymentId:paymentId
+uid:currentUser.uid,
+amount:0.01,
+memo:"Idle Realm reward"
 })
 })
 
-},
+const data=await r.json()
 
-onReadyForServerCompletion:async(paymentId,txid)=>{
+if(data.success){
 
-await fetch("/api/pi",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-action:"complete",
-paymentId:paymentId,
-txid:txid
-})
-})
+setStatus("Payment sent! txid:"+data.txid)
 
-alert("Payment completed")
+}else{
 
-donateBtn.disabled=false
+setStatus("Error sending payment")
 
-},
+}
 
-onCancel:()=>{
+}catch(e){
 
-donateBtn.disabled=false
+console.error(e)
 
-},
-
-onError:(err)=>{
-
-console.error(err)
-donateBtn.disabled=false
+setStatus("Server error")
 
 }
 
 }
-
-await Pi.createPayment(paymentData,callbacks)
-
-}
-
-/* =========================
-GAME STATE
-========================= */
-
-const city=document.getElementById("city")
-
-let buildings=["⚒️"]
-
-function renderCity(){
-
-city.innerHTML=""
-
-for(let i=0;i<9;i++){
-
-const tile=document.createElement("div")
-tile.className="tile"
-tile.textContent=buildings[i]||"⬜"
-
-city.appendChild(tile)
-
-}
-
-}
-
-renderCity()
-
-/* =========================
-GAME LOOP
-========================= */
-
-let state={
-pop:12,
-prod:30,
-bronze:0,
-stab:100,
-time:0
-}
-
-function update(){
-
-document.getElementById("pop").textContent=state.pop
-document.getElementById("prod").textContent=state.prod
-document.getElementById("bronze").textContent=state.bronze
-document.getElementById("stab").textContent=state.stab
-document.getElementById("time").textContent=state.time
-
-}
-
-setInterval(()=>{
-
-state.time++
-
-update()
-
-},1000)
-
-update()
 
 </script>
 
