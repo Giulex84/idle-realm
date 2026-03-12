@@ -2,35 +2,83 @@ export const onRequestPost = async ({ request, env }) => {
 
 const PI_API = "https://api.minepi.com/v2/payments";
 
-try {
-
-const body = await request.json();
-
-const { uid, amount, memo } = body;
-
-if (!uid || !amount) {
-
-return new Response(
-JSON.stringify({ error:"missing parameters" }),
-{ status:400 }
-);
-
-}
-
 const headers = {
 Authorization:`Key ${env.PI_API_KEY}`,
 "Content-Type":"application/json"
 };
 
-/* CREATE PAYMENT (A2U) */
+try{
+
+const body = await request.json();
+
+const { uid, amount, memo } = body;
+
+if(!uid || !amount){
+
+return new Response(
+JSON.stringify({error:"missing parameters"}),
+{status:400}
+);
+
+}
+
+/* -------------------------------- */
+/* CHECK INCOMPLETE SERVER PAYMENTS */
+/* -------------------------------- */
+
+const incomplete = await fetch(
+`${PI_API}/incomplete_server_payments`,
+{ headers }
+);
+
+const incompleteData = await incomplete.json();
+
+if(incomplete.ok && incompleteData.incomplete_server_payments?.length){
+
+for(const payment of incompleteData.incomplete_server_payments){
+
+try{
+
+if(payment.transaction?.txid){
+
+await fetch(`${PI_API}/${payment.identifier}/complete`,{
+method:"POST",
+headers,
+body:JSON.stringify({
+txid:payment.transaction.txid
+})
+});
+
+}else{
+
+await fetch(`${PI_API}/${payment.identifier}/cancel`,{
+method:"POST",
+headers
+});
+
+}
+
+}catch(e){
+
+console.error("cleanup error",e);
+
+}
+
+}
+
+}
+
+/* ------------ */
+/* CREATE A2U */
+/* ------------ */
 
 const create = await fetch(PI_API,{
 method:"POST",
 headers,
 body:JSON.stringify({
 payment:{
-uid:uid,
-amount:amount,
+uid,
+amount,
 memo:memo || "Idle Realm reward",
 metadata:{source:"idle_realm_a2u"}
 }
@@ -43,19 +91,24 @@ if(!create.ok){
 
 return new Response(
 JSON.stringify(createData),
-{ status:500 }
+{status:500}
 );
 
 }
 
 const paymentId = createData.identifier;
 
-/* SUBMIT PAYMENT */
+/* ------------ */
+/* SUBMIT */
+/* ------------ */
 
-const submit = await fetch(`${PI_API}/${paymentId}/submit`,{
+const submit = await fetch(
+`${PI_API}/${paymentId}/submit`,
+{
 method:"POST",
 headers
-});
+}
+);
 
 const submitData = await submit.json();
 
@@ -63,20 +116,34 @@ if(!submit.ok){
 
 return new Response(
 JSON.stringify(submitData),
-{ status:500 }
+{status:500}
 );
 
 }
 
-const txid = submitData.transaction.txid;
+const txid = submitData.transaction?.txid;
 
-/* COMPLETE PAYMENT */
+if(!txid){
 
-const complete = await fetch(`${PI_API}/${paymentId}/complete`,{
+return new Response(
+JSON.stringify({error:"missing txid"}),
+{status:500}
+);
+
+}
+
+/* ------------ */
+/* COMPLETE */
+/* ------------ */
+
+const complete = await fetch(
+`${PI_API}/${paymentId}/complete`,
+{
 method:"POST",
 headers,
-body:JSON.stringify({ txid })
-});
+body:JSON.stringify({txid})
+}
+);
 
 const completeData = await complete.json();
 
@@ -84,7 +151,7 @@ if(!complete.ok){
 
 return new Response(
 JSON.stringify(completeData),
-{ status:500 }
+{status:500}
 );
 
 }
@@ -95,7 +162,7 @@ success:true,
 paymentId,
 txid
 }),
-{ status:200 }
+{status:200}
 );
 
 }catch(err){
@@ -103,8 +170,8 @@ txid
 console.error(err);
 
 return new Response(
-JSON.stringify({ error:"server error" }),
-{ status:500 }
+JSON.stringify({error:"server error"}),
+{status:500}
 );
 
 }
