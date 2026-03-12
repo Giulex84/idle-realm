@@ -75,30 +75,13 @@ export const onRequestPost = async ({ request, env }) => {
 
         try {
 
-          if (payment.transaction?.txid) {
-
-            await fetchWithTimeout(
-              `${PI_API}/${payment.identifier}/complete`,
-              {
-                method: "POST",
-                headers,
-                body: JSON.stringify({
-                  txid: payment.transaction.txid
-                })
-              }
-            )
-
-          } else {
-
-            await fetchWithTimeout(
-              `${PI_API}/${payment.identifier}/cancel`,
-              {
-                method: "POST",
-                headers
-              }
-            )
-
-          }
+          await fetchWithTimeout(
+            `${PI_API}/${payment.identifier}/cancel`,
+            {
+              method: "POST",
+              headers
+            }
+          )
 
         } catch (e) {
 
@@ -137,40 +120,13 @@ export const onRequestPost = async ({ request, env }) => {
 
     const paymentId = createData.identifier
 
-    /* SUBMIT TRANSACTION */
-
-    const submit = await fetchWithTimeout(
-      `${PI_API}/${paymentId}/submit_transaction`,
-      {
-        method: "POST",
-        headers
-      }
-    )
-
-    const submitData = await safeJson(submit)
-
-    if (!submit.ok) {
-
-      console.error("SUBMIT ERROR", submitData)
-
-      return json(submitData, 500)
-
-    }
-
-    const txid = submitData.transaction?.txid
-
-    if (!txid) {
-      return json({ error: "missing txid" }, 500)
-    }
-
-    /* COMPLETE */
+    /* COMPLETE PAYMENT */
 
     const complete = await fetchWithTimeout(
       `${PI_API}/${paymentId}/complete`,
       {
         method: "POST",
-        headers,
-        body: JSON.stringify({ txid })
+        headers
       }
     )
 
@@ -186,8 +142,7 @@ export const onRequestPost = async ({ request, env }) => {
 
     return json({
       success: true,
-      paymentId,
-      txid
+      paymentId
     })
 
   } catch (err) {
