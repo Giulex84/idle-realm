@@ -9,7 +9,6 @@ function json(data, status = 200) {
 
 async function safeJson(res) {
   const text = await res.text();
-
   try {
     return JSON.parse(text);
   } catch {
@@ -30,17 +29,14 @@ async function fetchWithTimeout(url, options = {}, timeout = 8000) {
     });
 
     clearTimeout(id);
-
     return res;
 
   } catch (err) {
 
     clearTimeout(id);
-
     throw err;
 
   }
-
 }
 
 export const onRequestPost = async ({ request, env }) => {
@@ -60,6 +56,59 @@ export const onRequestPost = async ({ request, env }) => {
       "Content-Type": "application/json"
     };
 
+    /* CHECK ONGOING PAYMENTS */
+
+    const incomplete = await fetchWithTimeout(
+      `${PI_API}/incomplete_server_payments`,
+      { headers }
+    );
+
+    const incompleteData = await safeJson(incomplete);
+
+    if (
+      incomplete.ok &&
+      incompleteData.incomplete_server_payments?.length
+    ) {
+
+      for (const payment of incompleteData.incomplete_server_payments) {
+
+        try {
+
+          if (payment.transaction?.txid) {
+
+            await fetchWithTimeout(
+              `${PI_API}/${payment.identifier}/complete`,
+              {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  txid: payment.transaction.txid
+                })
+              }
+            );
+
+          } else {
+
+            await fetchWithTimeout(
+              `${PI_API}/${payment.identifier}/cancel`,
+              {
+                method: "POST",
+                headers
+              }
+            );
+
+          }
+
+        } catch (e) {
+
+          console.error("cleanup error", e);
+
+        }
+
+      }
+
+    }
+
     /* CREATE PAYMENT */
 
     const create = await fetchWithTimeout(PI_API, {
@@ -78,11 +127,8 @@ export const onRequestPost = async ({ request, env }) => {
     const createData = await safeJson(create);
 
     if (!create.ok) {
-
       console.error("CREATE ERROR", createData);
-
       return json(createData, 500);
-
     }
 
     const paymentId = createData.identifier;
@@ -100,11 +146,8 @@ export const onRequestPost = async ({ request, env }) => {
     const submitData = await safeJson(submit);
 
     if (!submit.ok) {
-
       console.error("SUBMIT ERROR", submitData);
-
       return json(submitData, 500);
-
     }
 
     const txid = submitData.transaction?.txid;
@@ -127,11 +170,8 @@ export const onRequestPost = async ({ request, env }) => {
     const completeData = await safeJson(complete);
 
     if (!complete.ok) {
-
       console.error("COMPLETE ERROR", completeData);
-
       return json(completeData, 500);
-
     }
 
     return json({
