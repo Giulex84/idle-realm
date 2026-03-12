@@ -5,6 +5,8 @@ export const onRequestPost = async ({ request, env }) => {
   try {
 
     const body = await request.json();
+    console.log("BODY:", body);
+
     const { uid, amount, memo } = body;
 
     if (!uid || !amount) {
@@ -18,54 +20,37 @@ export const onRequestPost = async ({ request, env }) => {
       "Content-Type": "application/json"
     };
 
-    /* CREATE */
+    console.log("Creating payment...");
 
-    const create = await fetch(PI_API, {
-      method: "POST",
+    const create = await fetch(PI_API,{
+      method:"POST",
       headers,
-      body: JSON.stringify({
-        payment: {
-          uid: uid,
-          amount: amount,
+      body:JSON.stringify({
+        payment:{
+          uid,
+          amount,
           memo: memo || "Idle Realm reward",
-          metadata: { source: "idle_realm_a2u" }
+          metadata:{ source:"idle_realm_a2u" }
         }
       })
     });
 
-    const createData = await create.json();
+    const text = await create.text();
+    console.log("PI RESPONSE:", text);
 
-    if (!create.ok) {
-      return new Response(JSON.stringify(createData), { status: 500 });
-    }
-
-    const paymentId = createData.identifier;
-
-    /* APPROVE */
-
-    const approve = await fetch(`${PI_API}/${paymentId}/approve`, {
-      method: "POST",
-      headers
+    return new Response(text,{
+      status:create.status,
+      headers:{ "content-type":"application/json" }
     });
 
-    const approveData = await approve.json();
+  } catch(err){
 
-    if (!approve.ok) {
-      return new Response(JSON.stringify(approveData), { status: 500 });
-    }
+    console.error("SERVER ERROR:", err);
 
     return new Response(JSON.stringify({
-      success: true,
-      paymentId
-    }), { status: 200 });
-
-  } catch (err) {
-
-    console.error(err);
-
-    return new Response(JSON.stringify({
-      error: "server error"
-    }), { status: 500 });
+      error:"server error",
+      message: err.message
+    }),{ status:500 });
 
   }
 
