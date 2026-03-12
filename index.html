@@ -3,7 +3,7 @@
 <head>
 
 <meta charset="UTF-8">
-<title>Idle Realm A2U Test</title>
+<title>Idle Realm Test</title>
 
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 
@@ -37,11 +37,17 @@ cursor:pointer;
 
 <body>
 
-<h1>Idle Realm A2U Test</h1>
+<h1>Idle Realm Test</h1>
 
 <div id="user">Not logged</div>
 
 <button id="login">Login</button>
+
+<br>
+
+<button id="buy" disabled>
+Buy Item (0.01π)
+</button>
 
 <button id="send" disabled>
 Send 0.01π Reward
@@ -57,13 +63,56 @@ function setStatus(msg){
 document.getElementById("status").innerText=msg
 }
 
+async function onIncompletePaymentFound(payment){
+
+console.log("Incomplete payment",payment)
+
+try{
+
+if(payment.transaction && payment.transaction.txid){
+
+await fetch("/api/pi",{
+method:"POST",
+headers:{ "Content-Type":"application/json" },
+body:JSON.stringify({
+action:"complete",
+paymentId:payment.identifier,
+txid:payment.transaction.txid
+})
+})
+
+setStatus("Recovered incomplete payment")
+
+}else{
+
+await fetch("/api/pi",{
+method:"POST",
+headers:{ "Content-Type":"application/json" },
+body:JSON.stringify({
+action:"cancel",
+paymentId:payment.identifier
+})
+})
+
+}
+
+}catch(e){
+
+console.error(e)
+
+}
+
+}
+
 document.getElementById("login").onclick=async()=>{
 
 try{
 
+setStatus("Logging in...")
+
 const auth=await Pi.authenticate(
 ["username","payments","wallet_address"],
-payment=>console.log(payment)
+onIncompletePaymentFound
 )
 
 currentUser=auth.user
@@ -71,13 +120,87 @@ currentUser=auth.user
 document.getElementById("user").innerText=
 "Logged as "+currentUser.username
 
+document.getElementById("buy").disabled=false
 document.getElementById("send").disabled=false
+
+setStatus("Login successful")
 
 }catch(e){
 
 console.error(e)
+setStatus("Login failed")
 
 }
+
+}
+
+document.getElementById("buy").onclick=async()=>{
+
+if(!currentUser)return
+
+setStatus("Creating payment...")
+
+const paymentData={
+amount:0.01,
+memo:"Idle Realm item",
+metadata:{ item:"test_item" }
+}
+
+Pi.createPayment(
+paymentData,
+{
+
+onReadyForServerApproval:async(paymentId)=>{
+
+setStatus("Approving payment...")
+
+await fetch("/api/pi",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+action:"approve",
+paymentId:paymentId
+})
+})
+
+},
+
+onReadyForServerCompletion:async(paymentId,txid)=>{
+
+setStatus("Completing payment...")
+
+await fetch("/api/pi",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+action:"complete",
+paymentId:paymentId,
+txid:txid
+})
+})
+
+setStatus("Purchase complete!")
+
+},
+
+onCancel:()=>{
+
+setStatus("Payment cancelled")
+
+},
+
+onError:(error)=>{
+
+console.error(error)
+setStatus("Payment error")
+
+}
+
+})
 
 }
 
@@ -105,18 +228,17 @@ const data=await r.json()
 
 if(data.success){
 
-setStatus("Payment sent! txid:"+data.txid)
+setStatus("Reward sent! txid:"+data.txid)
 
 }else{
 
-setStatus("Error sending payment")
+setStatus("Payment failed")
 
 }
 
 }catch(e){
 
 console.error(e)
-
 setStatus("Server error")
 
 }
