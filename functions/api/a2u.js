@@ -1,53 +1,47 @@
-export interface Env {
-  PI_API_KEY: string
-}
+const PI_API = "https://api.minepi.com/v2/payments";
 
-const PI_API = "https://api.minepi.com/v2/payments"
-
-function json(data: unknown, status = 200) {
+function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "content-type": "application/json" }
-  })
+  });
 }
 
-async function safeJson(res: Response) {
-  const text = await res.text()
+async function safeJson(res) {
+  const text = await res.text();
 
   try {
-    return JSON.parse(text)
+    return JSON.parse(text);
   } catch {
-    return { error: text }
+    return { error: text };
   }
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequestPost = async ({ request, env }) => {
 
   try {
 
-    const body = await request.json()
+    const body = await request.json();
 
-    const { uid, amount, memo } = body
+    const { uid, amount, memo } = body;
 
     if (!uid || !amount) {
-      return json({ error: "missing parameters" }, 400)
+      return json({ error: "missing parameters" }, 400);
     }
 
     const headers = {
       Authorization: `Key ${env.PI_API_KEY}`,
       "Content-Type": "application/json"
-    }
+    };
 
-    /* -------------------------------- */
     /* CHECK INCOMPLETE SERVER PAYMENTS */
-    /* -------------------------------- */
 
     const incomplete = await fetch(
       `${PI_API}/incomplete_server_payments`,
       { headers }
-    )
+    );
 
-    const incompleteData = await safeJson(incomplete)
+    const incompleteData = await safeJson(incomplete);
 
     if (
       incomplete.ok &&
@@ -66,20 +60,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
               body: JSON.stringify({
                 txid: payment.transaction.txid
               })
-            })
+            });
 
           } else {
 
             await fetch(`${PI_API}/${payment.identifier}/cancel`, {
               method: "POST",
               headers
-            })
+            });
 
           }
 
         } catch (e) {
 
-          console.error("cleanup error", e)
+          console.error("cleanup error", e);
 
         }
 
@@ -87,9 +81,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
     }
 
-    /* ------------ */
-    /* CREATE A2U   */
-    /* ------------ */
+    /* CREATE PAYMENT */
 
     const create = await fetch(PI_API, {
       method: "POST",
@@ -102,23 +94,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           metadata: { source: "idle_realm_a2u" }
         }
       })
-    })
+    });
 
-    const createData = await safeJson(create)
+    const createData = await safeJson(create);
 
     if (!create.ok) {
 
-      console.error("CREATE ERROR", createData)
+      console.error("CREATE ERROR", createData);
 
-      return json(createData, 500)
+      return json(createData, 500);
 
     }
 
-    const paymentId = createData.identifier
+    const paymentId = createData.identifier;
 
-    /* ------------ */
-    /* SUBMIT       */
-    /* ------------ */
+    /* SUBMIT */
 
     const submit = await fetch(
       `${PI_API}/${paymentId}/submit`,
@@ -126,29 +116,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         method: "POST",
         headers
       }
-    )
+    );
 
-    const submitData = await safeJson(submit)
+    const submitData = await safeJson(submit);
 
     if (!submit.ok) {
 
-      console.error("SUBMIT ERROR", submitData)
+      console.error("SUBMIT ERROR", submitData);
 
-      return json(submitData, 500)
+      return json(submitData, 500);
 
     }
 
-    const txid = submitData.transaction?.txid
+    const txid = submitData.transaction?.txid;
 
     if (!txid) {
-
-      return json({ error: "missing txid" }, 500)
-
+      return json({ error: "missing txid" }, 500);
     }
 
-    /* ------------ */
-    /* COMPLETE     */
-    /* ------------ */
+    /* COMPLETE */
 
     const complete = await fetch(
       `${PI_API}/${paymentId}/complete`,
@@ -157,15 +143,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         headers,
         body: JSON.stringify({ txid })
       }
-    )
+    );
 
-    const completeData = await safeJson(complete)
+    const completeData = await safeJson(complete);
 
     if (!complete.ok) {
 
-      console.error("COMPLETE ERROR", completeData)
+      console.error("COMPLETE ERROR", completeData);
 
-      return json(completeData, 500)
+      return json(completeData, 500);
 
     }
 
@@ -173,14 +159,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       success: true,
       paymentId,
       txid
-    })
+    });
 
   } catch (err) {
 
-    console.error("SERVER ERROR", err)
+    console.error("SERVER ERROR", err);
 
-    return json({ error: "server error" }, 500)
+    return json({ error: "server error" }, 500);
 
   }
 
-}
+};
