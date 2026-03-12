@@ -17,6 +17,32 @@ async function safeJson(res) {
   }
 }
 
+async function fetchWithTimeout(url, options = {}, timeout = 8000) {
+
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+
+    clearTimeout(id);
+
+    return res;
+
+  } catch (err) {
+
+    clearTimeout(id);
+
+    throw err;
+
+  }
+
+}
+
 export const onRequestPost = async ({ request, env }) => {
 
   try {
@@ -34,56 +60,9 @@ export const onRequestPost = async ({ request, env }) => {
       "Content-Type": "application/json"
     };
 
-    /* CHECK INCOMPLETE SERVER PAYMENTS */
-
-    const incomplete = await fetch(
-      `${PI_API}/incomplete_server_payments`,
-      { headers }
-    );
-
-    const incompleteData = await safeJson(incomplete);
-
-    if (
-      incomplete.ok &&
-      incompleteData.incomplete_server_payments?.length
-    ) {
-
-      for (const payment of incompleteData.incomplete_server_payments) {
-
-        try {
-
-          if (payment.transaction?.txid) {
-
-            await fetch(`${PI_API}/${payment.identifier}/complete`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                txid: payment.transaction.txid
-              })
-            });
-
-          } else {
-
-            await fetch(`${PI_API}/${payment.identifier}/cancel`, {
-              method: "POST",
-              headers
-            });
-
-          }
-
-        } catch (e) {
-
-          console.error("cleanup error", e);
-
-        }
-
-      }
-
-    }
-
     /* CREATE PAYMENT */
 
-    const create = await fetch(PI_API, {
+    const create = await fetchWithTimeout(PI_API, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -110,7 +89,7 @@ export const onRequestPost = async ({ request, env }) => {
 
     /* SUBMIT */
 
-    const submit = await fetch(
+    const submit = await fetchWithTimeout(
       `${PI_API}/${paymentId}/submit`,
       {
         method: "POST",
@@ -136,7 +115,7 @@ export const onRequestPost = async ({ request, env }) => {
 
     /* COMPLETE */
 
-    const complete = await fetch(
+    const complete = await fetchWithTimeout(
       `${PI_API}/${paymentId}/complete`,
       {
         method: "POST",
